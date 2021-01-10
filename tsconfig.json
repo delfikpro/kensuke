@@ -1,0 +1,13 @@
+{
+    "compilerOptions": {
+        "incremental": true,
+        "target": "es6",
+        "module": "commonjs",
+        "outDir": "./dist/server"
+    },
+    "exclude": [
+        "dist",
+        "node_modules"
+    ],
+    "include": ["./src"]
+}
