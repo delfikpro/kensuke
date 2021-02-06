@@ -40,18 +40,17 @@ export class StatStorageImpl implements StatStorage {
 
     saveStats(uuid: string, stats: Stats): Promise<void> {
         return new Promise((resolve, reject) => {
-            this.model.update(
+            this.model.findByIdAndUpdate(
                 { uuid: uuid },
                 new this.model({ uuid: uuid, data: stats }),
-                { overwrite: true },
+                { upsert: true },
                 (error, result) => {
                     if (error) {
                         reject(error);
                     } else {
                         resolve();
                     }
-                }
-            );
+            });
         });
     }
 
