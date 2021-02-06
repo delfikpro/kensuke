@@ -39,7 +39,14 @@ export class StatStorageImpl implements StatStorage {
             this.model.update(
                 { uuid: uuid },
                 new this.model({ uuid: uuid, data: stats }),
-                { overwrite: true }
+                { overwrite: true },
+                (error, result) => {
+                    if (error) {
+                        reject(error);
+                    } else {
+                        resolve();
+                    }
+                }
             );
         });
     }
