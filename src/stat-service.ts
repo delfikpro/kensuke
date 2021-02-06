@@ -191,6 +191,7 @@ handlerMap.playerSave = async (node, realm, packet: Packets.PlayerSave) => {
     storage.saveStats(player.uuid, player.stats);
     
     logger.info(`Realm ${realm.name} saved data for ${player.name}`);
+    return okResponse(`Saved ${player.name}`);
 
 }
 

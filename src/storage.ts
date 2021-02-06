@@ -43,7 +43,10 @@ export class StatStorageImpl implements StatStorage {
             this.model.findOneAndUpdate(
                 { uuid: uuid },
                 new this.model({ uuid: uuid, data: stats }),
-                { upsert: true },
+                {
+                    upsert: true,
+                    useFindAndModify: false
+                },
                 (error, result) => {
                     if (error) {
                         reject(error);
