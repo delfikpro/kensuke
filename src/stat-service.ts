@@ -62,10 +62,13 @@ class Player {
 
 let allPlayers: Record<string, Player> = {};
 
-let mongoUrl = process.env.MONGO_URL;
-if (!mongoUrl) throw Error('No MONGO_URL environment variable specified.')
+let requiredVariables = ["MONGO_URL", "MONGO_USER", "MONGO_PASSWORD"];
+for (let variable of requiredVariables) {
+    if (!process.env[variable]) throw Error('No MONGO_URL environment variable specified.')
+}
 
-let storage: StatStorage = new StatStorageImpl(mongoUrl);
+let env = process.env;
+let storage: StatStorage = new StatStorageImpl(env.MONGO_URL, env.MONGO_USER, env.MONGO_PASSWORD);
 
 
 export function okResponse(message: string): Sendable<Packets.Ok> {

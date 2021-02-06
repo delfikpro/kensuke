@@ -17,8 +17,12 @@ export class StatStorageImpl implements StatStorage {
         data: Object
     }));
 
-    constructor(url: string) {
-        mongoose.connect(url);
+    constructor(url: string, user: string, password: string) {
+        mongoose.connect(url, {
+            useNewUrlParser: true,
+            user: user,
+            pass: password
+        });
     }
 
     provideStats(uuid: string): Promise<Stats> {
