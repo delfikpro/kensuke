@@ -40,8 +40,8 @@ export class StatStorageImpl implements StatStorage {
 
     saveStats(uuid: string, stats: Stats): Promise<void> {
         return new Promise((resolve, reject) => {
-            this.model.findByIdAndUpdate(
-                uuid,
+            this.model.findOneAndUpdate(
+                { uuid: uuid },
                 new this.model({ uuid: uuid, data: stats }),
                 { upsert: true },
                 (error, result) => {
@@ -50,7 +50,7 @@ export class StatStorageImpl implements StatStorage {
                     } else {
                         resolve();
                     }
-            });
+                });
         });
     }
 
