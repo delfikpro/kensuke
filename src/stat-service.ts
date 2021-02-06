@@ -188,10 +188,15 @@ handlerMap.playerSave = async (node, realm, packet: Packets.PlayerSave) => {
         player.stats[scope] = packet.stats[scope];
     }
 
-    storage.saveStats(player.uuid, player.stats);
+    try {
+        await storage.saveStats(player.uuid, player.stats);
+        logger.info(`Realm ${realm.name} saved data for ${player.name}`);
+        return okResponse(`Saved ${player.name}`);
+    } catch (error) {
+        logger.error(`Error while saving ${player.name}:`, error)
+        return errorResponse(204, 'Database error')
+    }
     
-    logger.info(`Realm ${realm.name} saved data for ${player.name}`);
-    return okResponse(`Saved ${player.name}`);
 
 }
 

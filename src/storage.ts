@@ -32,6 +32,7 @@ export class StatStorageImpl implements StatStorage {
                     console.error(`Unable to load stats for ${uuid}!`, error);
                     reject(error);
                 } else {
+                    console.log(stats);
                     resolve(stats.length == 0 ? {} : stats[0]);
                 }
             });
