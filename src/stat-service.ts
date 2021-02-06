@@ -64,7 +64,7 @@ let allPlayers: Record<string, Player> = {};
 
 let requiredVariables = ["MONGO_URL", "MONGO_USER", "MONGO_PASSWORD"];
 for (let variable of requiredVariables) {
-    if (!process.env[variable]) throw Error('No MONGO_URL environment variable specified.')
+    if (!process.env[variable]) throw Error(`No ${variable} environment variable specified.`)
 }
 
 let env = process.env;
