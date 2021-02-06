@@ -14,7 +14,7 @@ export class StatStorageImpl implements StatStorage {
 
     model = mongoose.model('Stats', new mongoose.Schema({
         uuid: String,
-        data: Object
+        stats: Object
     }));
 
     constructor(url: string, user: string, password: string) {
@@ -27,7 +27,7 @@ export class StatStorageImpl implements StatStorage {
 
     provideStats(uuid: string): Promise<Stats> {
         return new Promise((resolve, reject) => {
-            this.model.find({ uuid: uuid }, (error, stats) => {
+            this.model.find({ uuid }, (error, stats) => {
                 if (error) {
                     console.error(`Unable to load stats for ${uuid}!`, error);
                     reject(error);
@@ -41,8 +41,8 @@ export class StatStorageImpl implements StatStorage {
     saveStats(uuid: string, stats: Stats): Promise<void> {
         return new Promise((resolve, reject) => {
             this.model.findOneAndUpdate(
-                { uuid: uuid },
-                new this.model({ uuid: uuid, data: stats }),
+                { uuid },
+                new this.model({ stats }),
                 {
                     upsert: true,
                     useFindAndModify: false
