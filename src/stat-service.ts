@@ -1,5 +1,5 @@
 import { MinecraftNode, Realm, Sendable } from "./network";
-import { Stats, StatStorage } from "./storage";
+import { Stats, StatStorage, StatStorageImpl } from "./storage";
 import * as Packets from './packets'
 import { Account, authorize } from "./authorization";
 import * as winston from 'winston';
@@ -62,7 +62,10 @@ class Player {
 
 let allPlayers: Record<string, Player> = {};
 
-let storage: StatStorage;
+let mongoUrl = process.env.MONGO_URL;
+if (!mongoUrl) throw Error('No MONGO_URL environment variable specified.')
+
+let storage: StatStorage = new StatStorageImpl(mongoUrl);
 
 
 export function okResponse(message: string): Sendable<Packets.Ok> {
