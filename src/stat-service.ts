@@ -96,6 +96,9 @@ handlerMap.auth = async (node, _realm, packet: Packets.Auth) => {
         return errorResponse(102, `Invalid credentials`);
 
     node.account = account;
+
+    logger.info(`${account.login} authorized.`)
+
     return okResponse(`Successfully authorized as ${account.login}`);
 
 };
@@ -117,11 +120,15 @@ handlerMap.playerConnect = async (node, newRealm, packet: Packets.PlayerConnect)
 
         if (oldRealm != newRealm) {
 
+            logger.info(`${player.name} connected to ${newRealm.name}, asking ${oldRealm.name} for a save...`)
+
             let response = await oldRealm.sendRequest(['playerDisconnect', { uuid }]);
 
             // ToDo: Timeout errors probably shouldn't prevent logins
-            if (response.type == 'error')
+            if (response.type == 'error') {
+                logger.info(`${newRealm.name} failed to save data for ${player.name}: ${(response.data as Packets.Error).errorMessage}`)
                 throw asError(response.data as Packets.Error);
+            }
 
         }
 
@@ -131,10 +138,15 @@ handlerMap.playerConnect = async (node, newRealm, packet: Packets.PlayerConnect)
             stats: player.filterStats(node.account.allowedScopes)
         };
 
+        logger.info(`Sending data of ${player.name} to ${newRealm.name}`)
+
         return ['playerData', packet];
 
     } else {
         player = new Player(uuid, packet.username);
+
+        logger.info(`New player ${player.name} joined the network on ${newRealm.name}`)
+
         player.stats = await storage.provideStats(uuid);
         allPlayers[uuid] = player;
         player.currentRealm = newRealm;
@@ -154,12 +166,15 @@ handlerMap.playerSave = async (node, realm, packet: Packets.PlayerSave) => {
     let player = allPlayers[uuid];
 
     if (!player) {
+        logger.info(`${realm.name} tried to save data for an offline player ${uuid}`)
         return errorResponse(201, 'Tried to save stats for an offline player ' + uuid)
     }
 
     if (player.currentRealm != realm) {
+        logger.info(`${realm.name} tried to save data for ${player.name}, but the player is on ${player.currentRealm.name}`)
         return errorResponse(202, `Player ${player.toString()} is connected to ${player.currentRealm.name}, rejected save from ${realm.name}`)
     }
+
 
     // First we check access to all scopes
     for (let scope in packet.stats) {
@@ -174,6 +189,8 @@ handlerMap.playerSave = async (node, realm, packet: Packets.PlayerSave) => {
     }
 
     storage.saveStats(player.uuid, player.stats);
+    
+    logger.info(`Realm ${realm.name} saved data for ${player.name}`);
 
 }
 
