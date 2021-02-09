@@ -12,22 +12,30 @@ export interface StatStorage {
 
 export class StatStorageImpl implements StatStorage {
 
-    model = mongoose.model('Stats', new mongoose.Schema({
-        uuid: String,
-        stats: Object
-    }));
+    StatsDocument: mongoose.Model<mongoose.Document<any>>;
 
-    constructor(url: string, user: string, password: string) {
-        mongoose.connect(url, {
+    async connect(url: string, user: string, password: string): Promise<mongoose.Mongoose> {
+
+        let connection = await mongoose.connect(url, {
             useNewUrlParser: true,
             user: user,
             pass: password
         });
+
+        this.StatsDocument = connection.model('StatsDocument', new mongoose.Schema({
+            uuid: String,
+            stats: Object
+        }), process.env.MONGO_COLLECTION || 'stats');
+
+        await this.StatsDocument.createCollection();
+
+        return connection;
+
     }
 
     provideStats(uuid: string): Promise<Stats> {
         return new Promise((resolve, reject) => {
-            this.model.find({ uuid }, (error, stats) => {
+            this.StatsDocument.find({ uuid }, (error, stats) => {
                 if (error) {
                     console.error(`Unable to load stats for ${uuid}!`, error);
                     reject(error);
@@ -41,7 +49,7 @@ export class StatStorageImpl implements StatStorage {
 
     saveStats(uuid: string, stats: Stats): Promise<void> {
         return new Promise((resolve, reject) => {
-            this.model.updateOne(
+            this.StatsDocument.updateOne(
                 { uuid },
                 { uuid, stats },
                 {

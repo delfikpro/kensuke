@@ -68,7 +68,9 @@ for (let variable of requiredVariables) {
 }
 
 let env = process.env;
-let storage: StatStorage = new StatStorageImpl(env.MONGO_URL, env.MONGO_USER, env.MONGO_PASSWORD);
+let storage: StatStorage = new StatStorageImpl();
+
+await (storage as StatStorageImpl).connect(env.MONGO_URL, env.MONGO_USER, env.MONGO_PASSWORD);
 
 
 export function okResponse(message: string): Sendable<Packets.Ok> {
