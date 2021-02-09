@@ -1,8 +1,9 @@
 import { MinecraftNode, Realm, Sendable } from "./network";
-import { Stats, StatStorage, StatStorageImpl } from "./storage";
+import { Stats } from "./storage";
 import * as Packets from './packets'
 import { Account, authorize } from "./authorization";
 import * as winston from 'winston';
+import { storage } from ".";
 
 // winston.addColors({
 //     info: 'blue',
@@ -61,17 +62,6 @@ class Player {
 }
 
 let allPlayers: Record<string, Player> = {};
-
-let requiredVariables = ["MONGO_URL", "MONGO_USER", "MONGO_PASSWORD"];
-for (let variable of requiredVariables) {
-    if (!process.env[variable]) throw Error(`No ${variable} environment variable specified.`)
-}
-
-let env = process.env;
-let storage: StatStorage = new StatStorageImpl();
-
-await (storage as StatStorageImpl).connect(env.MONGO_URL, env.MONGO_USER, env.MONGO_PASSWORD);
-
 
 export function okResponse(message: string): Sendable<Packets.Ok> {
     return ['ok', { message }]

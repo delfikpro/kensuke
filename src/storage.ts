@@ -10,7 +10,22 @@ export interface StatStorage {
 
 }
 
-export class StatStorageImpl implements StatStorage {
+export async function init(): Promise<StatStorage> {
+    
+    let requiredVariables = ["MONGO_URL", "MONGO_USER", "MONGO_PASSWORD"];
+    for (let variable of requiredVariables) {
+        if (!process.env[variable]) throw Error(`No ${variable} environment variable specified.`)
+    }
+
+    let env = process.env;
+    let storage: StatStorageImpl = new StatStorageImpl();
+
+    await storage.connect(env.MONGO_URL, env.MONGO_USER, env.MONGO_PASSWORD);
+
+    return storage;
+}
+
+class StatStorageImpl implements StatStorage {
 
     StatsDocument: mongoose.Model<mongoose.Document<any>>;
 
