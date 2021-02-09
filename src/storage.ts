@@ -33,6 +33,7 @@ class StatStorageImpl implements StatStorage {
 
         let connection = await mongoose.connect(url, {
             useNewUrlParser: true,
+            useUnifiedTopology: true,
             user: user,
             pass: password
         });
