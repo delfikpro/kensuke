@@ -1,4 +1,5 @@
 import * as mongoose from 'mongoose';
+import { logger } from '.';
 
 export type Stats = Record<string, any>
 
@@ -41,9 +42,13 @@ class StatStorageImpl implements StatStorage {
         this.StatsDocument = connection.model('StatsDocument', new mongoose.Schema({
             uuid: String,
             stats: Object
-        }), process.env.MONGO_COLLECTION || 'stats');
+        }), process.env.MONGO_COLLECTION || 'playerStats');
 
-        await this.StatsDocument.createCollection();
+        /*let collection = await */this.StatsDocument.createCollection({}, (err, collection) => {
+            if (err) logger.error(err)
+            else logger.info('Created collection ' + collection.collectionName)
+        });
+
 
         return connection;
 

@@ -2,40 +2,7 @@ import { MinecraftNode, Realm, Sendable } from "./network";
 import { Stats } from "./storage";
 import * as Packets from './packets'
 import { Account, authorize } from "./authorization";
-import * as winston from 'winston';
-import { storage } from ".";
-
-// winston.addColors({
-//     info: 'blue',
-//     warning: 'yellow',
-//     error: 'red'
-
-// })
-
-const logFormat = [
-    winston.format.timestamp({
-        format: 'YYYY-MM-DD HH:mm:ss'
-    }),
-    winston.format.errors({stack: true}),
-    winston.format.splat(),
-    winston.format.simple(),
-    winston.format.printf(info => `[${info.timestamp}] ${info.level}: ${info.message}`)
-];
-
-export const logger = winston.createLogger({
-    level: 'debug',
-    format: winston.format.combine(...logFormat),
-    transports: [
-        new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
-        new winston.transports.File({ filename: 'logs/combined.log' }),
-        new winston.transports.Console({
-            format: winston.format.combine(
-                winston.format.colorize(),
-                ...logFormat
-            )
-        })
-    ]
-});
+import { logger, storage } from ".";
 
 class Player {
 
