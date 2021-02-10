@@ -2,6 +2,9 @@ import * as Packets from './packets';
 import { v4 as randomUUID } from 'uuid';
 import { Account } from './authorization';
 import * as WebSocket from 'ws';
+import { time } from 'console';
+
+export const timeout = +process.env.STATSERVICE_TIMEOUT || 5000;
 
 export type Sendable<T extends object> = [packetClass: string, data: T];
 
@@ -41,8 +44,8 @@ export class MinecraftNode {
         let promise = new Promise<Packets.Frame>((resolve, reject) => {
             let wait = setTimeout(() => {
                 delete runningRequests[frame.uuid]
-                reject('Timeout');
-            }, 5000);
+                resolve({type: "error", data: {"errorCode": 42, "errorMessage": "Timeout"}});
+            }, timeout);
 
             runningRequests[frame.uuid] = frame => {
                 clearTimeout(wait);

@@ -86,7 +86,7 @@ initStorage().then($storage => {
     
             } catch (error) {
                 response = errorResponse(-1, 'Internal error');
-                console.log(error);
+                logger.warn(error);
             }
     
     
@@ -105,9 +105,7 @@ initStorage().then($storage => {
             }
     
         });
-    
-        //send immediatly a feedback to the incoming connection    
-        ws.send('Hi there, I am a WebSocket server');
+
     });
 
 })
