@@ -86,6 +86,7 @@ handlerMap.createSession = async (node, packet: Packets.CreateSession) => {
     }
 
     let uuid = packet.playerId;
+    if (!uuid) return errorResponse(104, 'No playerId provided')
 
     var player = playerMap[uuid];
 
@@ -125,13 +126,13 @@ handlerMap.createSession = async (node, packet: Packets.CreateSession) => {
     player.currentSession = newSession;
 
     let dataPacket: Packets.SyncData = {
-        session: uuid,
+        session: packet.session,
         stats: player.filterStats(node.account.allowedScopes)
     };
 
     logger.info(`Sending data of ${player.name} to ${newSession.realm}`)
 
-    return ['playerData', dataPacket];
+    return ['syncData', dataPacket];
 }
 
 handlerMap.syncData = async (node, packet: Packets.SyncData) => {

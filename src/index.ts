@@ -5,6 +5,7 @@ import { Account, authorize } from './authorization';
 import { MinecraftNode, MinecraftWebSocket, runningRequests, Sendable } from './network';
 import { errorResponse, handlerMap } from './stat-service';
 import * as winston from 'winston';
+import { IncomingMessage } from 'http';
 
 export var storage: StatStorage
 
@@ -42,9 +43,15 @@ initStorage().then($storage => {
     const wss = new WebSocket.Server({ port: +process.env.PORT || 8999 });
     logger.info('Ready!')
     
-    wss.on('connection', (ws: WebSocket) => {
+    wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
     
-        let node = new MinecraftNode(ws as MinecraftWebSocket);
+        let address = req.connection.remoteAddress;
+        let node = new MinecraftNode(ws as MinecraftWebSocket, address);
+        logger.info(`${address} connected.`);
+
+        ws.on('close', async (code: number, reason: string) => {
+            logger.info(`${address} disconnected: ${code} ${reason}`)
+        })
     
         ws.on('message', async (message: string) => {
     

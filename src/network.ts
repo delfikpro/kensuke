@@ -16,9 +16,13 @@ export const runningRequests: Record<string, (frame: Packets.Frame) => void> = {
 export class MinecraftNode {
 
     isAlive: boolean = true;
+    name: string;
     account: Account;
 
-    constructor(readonly socket: MinecraftWebSocket) {
+    constructor(
+        readonly socket: MinecraftWebSocket,
+        readonly address: string,
+    ) {
         socket.minecraftNode = this;
     }
 
