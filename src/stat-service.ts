@@ -30,9 +30,7 @@ class Player {
         let stats: Stats = {};
         for (let scope of scopes) {
             stats[scope] = this.stats[scope];
-            console.debug(`allowed scope '${scope}'`)
         }
-        console.debug(JSON.stringify(this.stats))
         return stats;
     }
 
