@@ -71,12 +71,11 @@ initStorage().then($storage => {
             try {
     
                 let handle = handlerMap[frame.type];
-                let realm = node.realms[frame.realm];
     
                 if (frame.type != 'auth' && !node.account)
                     response = errorResponse(1, 'Unauthorized');
                 else if (handle)
-                    response = await handle(node, realm, frame.data);
+                    response = await handle(node, frame.data);
     
             } catch (error) {
                 response = errorResponse(-1, 'Internal error');
@@ -90,11 +89,10 @@ initStorage().then($storage => {
             }
     
             if (response) {
-                logger.debug('Sending %s to realm %s', JSON.stringify(response), frame.realm)
+                logger.debug('Sending %s to node %s', JSON.stringify(response), node.toString())
                 node.sendFrame({
                     type: response[0],
                     data: response[1],
-                    realm: frame.realm,
                     uuid: frame.uuid
                 });
             }

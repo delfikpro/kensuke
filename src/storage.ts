@@ -44,9 +44,9 @@ class StatStorageImpl implements StatStorage {
             stats: Object
         }), process.env.MONGO_COLLECTION || 'playerStats');
 
-        /*let collection = await */this.StatsDocument.createCollection({}, (err, collection) => {
+        this.StatsDocument.createCollection({}, (err, collection) => {
             if (err) logger.error(err)
-            else logger.info('Created collection ' + collection.collectionName)
+            else logger.info(`Using collection '${collection.collectionName}'`)
         });
 
 

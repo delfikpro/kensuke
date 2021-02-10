@@ -1,12 +1,24 @@
-import { MinecraftNode, Realm, Sendable } from "./network";
+import { MinecraftNode, Sendable } from "./network";
 import { Stats } from "./storage";
 import * as Packets from './packets'
 import { Account, authorize } from "./authorization";
 import { logger, storage } from ".";
 
+class Session {
+
+    public active: boolean = true
+
+    constructor(
+        public readonly player: Player,
+        public readonly sessionId: string,
+        public readonly ownerNode: MinecraftNode,
+        public readonly realm: string,
+    ) { }
+}
+
 class Player {
 
-    currentRealm: Realm;
+    currentSession: Session;
     stats: Stats;
 
     constructor(
@@ -28,7 +40,8 @@ class Player {
 
 }
 
-let allPlayers: Record<string, Player> = {};
+let playerMap: Record<Packets.UUID, Player> = {};
+let sessionMap: Record<Packets.UUID, Session> = {};
 
 export function okResponse(message: string): Sendable<Packets.Ok> {
     return ['ok', { message }]
@@ -42,9 +55,9 @@ export function asError(error: Packets.Error) {
     return new Error(`Error ${error.errorCode}: ${error.errorMessage}`);
 }
 
-export const handlerMap: Record<string, (node: MinecraftNode, realm: Realm, packet: any) => Promise<Sendable<object>>> = {};
+export const handlerMap: Record<string, (node: MinecraftNode, packet: any) => Promise<Sendable<object>>> = {};
 
-handlerMap.auth = async (node, _realm, packet: Packets.Auth) => {
+handlerMap.auth = async (node, packet: Packets.Auth) => {
 
     if (node.account)
         return errorResponse(101, `Already authorized as ${node.account.login}.`)
@@ -63,75 +76,81 @@ handlerMap.auth = async (node, _realm, packet: Packets.Auth) => {
 };
 
 
-handlerMap.addRealm = async (node, realm, packet: Packets.AddRealm) => {
-    node.realms[packet.realm] = new Realm(packet.realm, node);
-    return okResponse(`Successfully added realm ${packet.realm}`);
-}
 
-handlerMap.playerConnect = async (node, newRealm, packet: Packets.PlayerConnect) => {
+handlerMap.createSession = async (node, packet: Packets.CreateSession) => {
 
-    let uuid = packet.uuid;
+    let existingSession = sessionMap[packet.session];
+    if (existingSession) {
+        logger.warn(`${packet.realm} tried to create an existing session: ${packet.session}`);
+        return errorResponse(103, 'Session already exists')
+    }
 
-    var player = allPlayers[uuid];
+    let uuid = packet.playerId;
+
+    var player = playerMap[uuid];
 
     if (player) {
-        let oldRealm = player.currentRealm;
+        let oldSession = player.currentSession;
 
-        if (oldRealm != newRealm) {
+        if (!oldSession?.active) {
+            logger.warn(`Player ${player.name} wasn't removed upon leaving the network. This is probably a bug.`)
+        } else {
 
-            logger.info(`${player.name} connected to ${newRealm.name}, asking ${oldRealm.name} for a save...`)
+            logger.info(`Player ${player.name} connected to ${packet.realm}, asking ${oldSession.realm} to synchronize stats...`)
 
-            let response = await oldRealm.sendRequest(['playerDisconnect', { uuid }]);
+            let response = await oldSession.ownerNode.sendRequest(['requestSync', { session: oldSession.sessionId }]);
 
             // ToDo: Timeout errors probably shouldn't prevent logins
             if (response.type == 'error') {
-                logger.info(`${newRealm.name} failed to save data for ${player.name}: ${(response.data as Packets.Error).errorMessage}`)
+                logger.info(`${oldSession.realm} failed to save data for ${player.name}: ${(response.data as Packets.Error).errorMessage}`)
                 throw asError(response.data as Packets.Error);
             }
 
         }
 
-        let packet: Packets.PlayerData = {
-            uuid,
-            previousRealm: oldRealm.name,
-            stats: player.filterStats(node.account.allowedScopes)
-        };
-
-        logger.info(`Sending data of ${player.name} to ${newRealm.name}`)
-
-        return ['playerData', packet];
-
     } else {
         player = new Player(uuid, packet.username);
 
-        logger.info(`New player ${player.name} joined the network on ${newRealm.name}`)
+        logger.info(`Player ${player.name} joined the network on ${packet.realm}`)
 
         player.stats = await storage.provideStats(uuid);
-        allPlayers[uuid] = player;
-        player.currentRealm = newRealm;
+        playerMap[uuid] = player;
 
-        let dataPacket: Packets.PlayerData = {
-            uuid,
-            stats: player.filterStats(node.account.allowedScopes)
-        };
-
-        return ['playerData', dataPacket];
     }
+
+    let newSession = new Session(player, packet.session, node, packet.realm);
+
+    sessionMap[packet.session] = newSession
+
+    player.currentSession = newSession;
+
+    let dataPacket: Packets.SyncData = {
+        session: uuid,
+        stats: player.filterStats(node.account.allowedScopes)
+    };
+
+    logger.info(`Sending data of ${player.name} to ${newSession.realm}`)
+
+    return ['playerData', dataPacket];
 }
 
-handlerMap.playerSave = async (node, realm, packet: Packets.PlayerSave) => {
+handlerMap.syncData = async (node, packet: Packets.SyncData) => {
 
-    let uuid = packet.uuid;
-    let player = allPlayers[uuid];
+    let sessionId = packet.session;
 
-    if (!player) {
-        logger.info(`${realm.name} tried to save data for an offline player ${uuid}`)
-        return errorResponse(201, 'Tried to save stats for an offline player ' + uuid)
+    let session = sessionMap[sessionId];
+
+    if (!session) {
+        logger.info(`Unable to find session ${sessionId}`)
+        return errorResponse(201, `Unable to find session ${sessionId}`)
     }
 
-    if (player.currentRealm != realm) {
-        logger.info(`${realm.name} tried to save data for ${player.name}, but the player is on ${player.currentRealm.name}`)
-        return errorResponse(202, `Player ${player.toString()} is connected to ${player.currentRealm.name}, rejected save from ${realm.name}`)
+    let player = session.player
+    let realm = session.realm
+
+    if (session.ownerNode != node) {
+        logger.info(`${node.account.login} tried to save data for ${player.name}, but the player is on ${realm}`)
+        return errorResponse(202, `Player ${player.toString()} is connected to ${realm}`)
     }
 
 
@@ -149,26 +168,38 @@ handlerMap.playerSave = async (node, realm, packet: Packets.PlayerSave) => {
 
     try {
         await storage.saveStats(player.uuid, player.stats);
-        logger.info(`Realm ${realm.name} saved data for ${player.name}`);
+        logger.info(`Realm ${session.realm} saved data for ${player.name}`);
         return okResponse(`Saved ${player.name}`);
     } catch (error) {
         logger.error(`Error while saving ${player.name}:`, error)
         return errorResponse(204, 'Database error')
     }
-    
+
 
 }
 
-handlerMap.playerDisconnect = async (node, realm, packet: Packets.PlayerDisconnect) => {
+handlerMap.endSession = async (node, packet: Packets.EndSession) => {
 
-    let uuid = packet.uuid;
-    let player = allPlayers[uuid];
-    if (player) {
-        if (player.currentRealm == realm) {
-            delete allPlayers[uuid];
-        }
+    let sessionId = packet.session;
+
+    let session = sessionMap[sessionId];
+
+    if (!session) {
+        logger.warn(`${node.toString()} tried to end a dead session ${sessionId}`)
+        return okResponse('Already dead')
     }
 
-    return null;
+    let player = session.player;
+    
+    delete sessionMap[sessionId]
+    
+    if (player.currentSession == session) {
+        logger.debug(`${session.realm} closed the active session ${session.sessionId} of ${player.name}`)
+        delete playerMap[player.uuid]
+    } else {
+        logger.debug(`${session.realm} closed an inactive session ${session.sessionId} of ${player.name}`)
+    }
+
+    return okResponse('Ok')
 
 }
