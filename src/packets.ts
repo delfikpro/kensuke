@@ -25,6 +25,7 @@ export type Error = {
 export type Auth = {
     login: string
     password: string
+    nodeName: string
 }
 
 /**
