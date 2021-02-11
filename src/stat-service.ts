@@ -40,8 +40,8 @@ class Player {
 
 }
 
-let playerMap: Record<Packets.UUID, Player> = {};
-let sessionMap: Record<Packets.UUID, Session> = {};
+export const playerMap: Record<Packets.UUID, Player> = {};
+export const sessionMap: Record<Packets.UUID, Session> = {};
 
 export function okResponse(message: string): Sendable<Packets.Ok> {
     return ['ok', { message }]

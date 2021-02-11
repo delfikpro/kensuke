@@ -3,7 +3,7 @@ import * as Packets from './packets';
 import { StatStorage, Stats, init as initStorage } from './storage';
 import { Account, authorize } from './authorization';
 import { MinecraftNode, MinecraftWebSocket, runningRequests, Sendable } from './network';
-import { errorResponse, handlerMap } from './stat-service';
+import { errorResponse, handlerMap, playerMap, sessionMap } from './stat-service';
 import * as winston from 'winston';
 import { IncomingMessage } from 'http';
 
@@ -51,6 +51,18 @@ initStorage().then($storage => {
 
         ws.on('close', async (code: number, reason: string) => {
             logger.info(`${address} disconnected: ${code} ${reason}`)
+            let activeSessions = [];
+            for (let sessionId in sessionMap) {
+                let session = sessionMap[sessionId]
+                if (session.player.currentSession == session && session.ownerNode == node) {
+                    activeSessions.push(session)
+                }
+            }
+            for (let session of activeSessions) {
+                delete sessionMap[session]
+                delete playerMap[session.player.uuid]
+                console.log(`Abrupt restart caused session ${session.id} of ${session.player.name} to end.`)
+            }
         })
     
         ws.on('message', async (message: string) => {
