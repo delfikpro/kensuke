@@ -4,7 +4,7 @@ import * as Packets from './packets'
 import { Account, authorize } from "./authorization";
 import { logger, storage } from ".";
 
-class Session {
+export class Session {
 
     public active: boolean = true
 
@@ -16,7 +16,7 @@ class Session {
     ) { }
 }
 
-class Player {
+export class Player {
 
     currentSession: Session;
     stats: Stats;
