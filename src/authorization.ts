@@ -11,7 +11,7 @@ let accounts: Record<string, Account> = {};
 
 accounts.delfikpro = {
     login: 'delfikpro',
-    allowedScopes: ['somegame'],
+    allowedScopes: ['somegame', 'dungeons'],
     passwordHash: hashPassword('12345')
 }
 
