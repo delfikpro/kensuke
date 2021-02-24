@@ -1,7 +1,6 @@
 import * as WebSocket from 'ws';
 import * as Packets from './packets';
 import { StatStorage, Stats, init as initStorage } from './storage';
-import { Account, authorize } from './authorization';
 import { MinecraftNode, MinecraftWebSocket, runningRequests, Sendable } from './network';
 import { Session, errorResponse, handlerMap, playerMap, sessionMap } from './stat-service';
 import * as winston from 'winston';
@@ -92,12 +91,12 @@ initStorage().then($storage => {
                 let handle = handlerMap[frame.type];
     
                 if (frame.type != 'auth' && !node.account)
-                    response = errorResponse(1, 'Unauthorized');
+                    response = errorResponse('FATAL', 'Unauthorized');
                 else if (handle)
                     response = await handle(node, frame.data);
     
             } catch (error) {
-                response = errorResponse(-1, 'Internal error');
+                response = errorResponse('SEVERE', 'Internal error');
                 logger.warn(error);
             }
     

@@ -1,8 +1,8 @@
 import * as Packets from './packets';
 import { v4 as randomUUID } from 'uuid';
-import { Account } from './authorization';
 import * as WebSocket from 'ws';
 import { time } from 'console';
+import { Account, Scope } from './storage';
 
 export const timeout = +process.env.STATSERVICE_TIMEOUT || 5000;
 
@@ -21,6 +21,7 @@ export class MinecraftNode {
     isAlive: boolean = true;
     name: string;
     account: Account;
+    scopes: Scope[] = [];
 
     constructor(
         readonly socket: MinecraftWebSocket,
@@ -44,7 +45,7 @@ export class MinecraftNode {
         let promise = new Promise<Packets.Frame>((resolve, reject) => {
             let wait = setTimeout(() => {
                 delete runningRequests[frame.uuid]
-                resolve({type: "error", data: {"errorCode": 42, "errorMessage": "Timeout"}});
+                resolve({type: "error", data: {"errorLevel": "TIMEOUT", "errorMessage": "Timeout"}});
             }, timeout);
 
             runningRequests[frame.uuid] = frame => {
@@ -72,6 +73,12 @@ export class MinecraftNode {
 
     sendFrame(frame: Packets.Frame): void {
         this.socket.send(JSON.stringify(frame));
+    }
+
+    getScope(scopeId: string): Scope {
+        for (let scope of this.scopes) {
+            if (scope.id == scopeId) return scope;
+        }
     }
 
 }

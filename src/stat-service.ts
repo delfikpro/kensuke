@@ -1,8 +1,9 @@
 import { MinecraftNode, Sendable } from "./network";
-import { Stats } from "./storage";
+import { PlayerLockState, Scope, Stats } from "./storage";
 import * as Packets from './packets'
-import { Account, authorize } from "./authorization";
 import { logger, storage } from ".";
+import { hashPassword } from "./authorization";
+import { access } from "fs";
 
 export class Session {
 
@@ -14,22 +15,32 @@ export class Session {
         public readonly ownerNode: MinecraftNode,
         public readonly realm: string,
     ) { }
+
+    public toLockState(): PlayerLockState {
+        return {
+            id: this.player.uuid,
+            session: this.sessionId,
+            realm: this.realm
+        }
+    }
+
 }
 
 export class Player {
 
     currentSession: Session;
-    stats: Stats;
+    stats: Stats = {};
 
     constructor(
         public readonly uuid: string,
         public name: string
     ) { }
 
-    filterStats(scopes: string[]) {
+    async getStats(scopes: Scope[]): Promise<Stats> {
         let stats: Stats = {};
         for (let scope of scopes) {
-            stats[scope] = this.stats[scope];
+            let s = this.stats[scope.id];
+            stats[scope.id] = s || await storage.readData(scope, this.uuid)
         }
         return stats;
     }
@@ -47,12 +58,12 @@ export function okResponse(message: string): Sendable<Packets.Ok> {
     return ['ok', { message }]
 }
 
-export function errorResponse(errorCode: number, errorMessage: string): Sendable<Packets.Error> {
-    return ['error', { errorCode, errorMessage }]
+export function errorResponse(errorLevel: Packets.ErrorLevel, errorMessage: string): Sendable<Packets.Error> {
+    return ['error', { errorLevel, errorMessage }]
 }
 
 export function asError(error: Packets.Error) {
-    return new Error(`Error ${error.errorCode}: ${error.errorMessage}`);
+    return new Error(`Error ${error.errorLevel}: ${error.errorMessage}`);
 }
 
 export const handlerMap: Record<string, (node: MinecraftNode, packet: any) => Promise<Sendable<object>>> = {};
@@ -60,12 +71,12 @@ export const handlerMap: Record<string, (node: MinecraftNode, packet: any) => Pr
 handlerMap.auth = async (node, packet: Packets.Auth) => {
 
     if (node.account)
-        return errorResponse(101, `Already authorized as ${node.account.login}.`)
+        return errorResponse('WARNING', `Already authorized as ${node.account.login}.`)
 
-    let account = authorize(packet.login, packet.password);
+    let account = storage.getAccount(packet.login);
 
-    if (!account)
-        return errorResponse(102, `Invalid credentials`);
+    if (!account || account.passwordHash !== hashPassword(packet.password))
+        return errorResponse('FATAL', `Invalid credentials`);
 
     node.account = account;
 
@@ -75,18 +86,36 @@ handlerMap.auth = async (node, packet: Packets.Auth) => {
 
 };
 
+handlerMap.useScopes = async (node, packet: Packets.UseScopes) => {
 
+    for (let scopeId of packet.scopes) {
+
+        if (node.getScope(scopeId)) continue
+
+        let scope = storage.getScope(scopeId)
+        if (!scope) {
+            scope = await storage.registerScope(scopeId, node.account)
+        }
+
+        if (!node.account.allowedScopes.includes(scopeId)) {
+            return errorResponse('FATAL', `Not enough permissions to use ${scopeId} scope`)
+        }
+
+        node.scopes.push(scope)
+    }
+
+}
 
 handlerMap.createSession = async (node, packet: Packets.CreateSession) => {
 
     let existingSession = sessionMap[packet.session];
     if (existingSession) {
         logger.warn(`${packet.realm} tried to create an existing session: ${packet.session}`);
-        return errorResponse(103, 'Session already exists')
+        return errorResponse('SEVERE', 'Session already exists')
     }
 
     let uuid = packet.playerId;
-    if (!uuid) return errorResponse(104, 'No playerId provided')
+    if (!uuid) return errorResponse('SEVERE', 'No playerId provided')
 
     var player = playerMap[uuid];
 
@@ -114,7 +143,6 @@ handlerMap.createSession = async (node, packet: Packets.CreateSession) => {
 
         logger.info(`Player ${player.name} joined the network on ${packet.realm}`)
 
-        player.stats = await storage.provideStats(uuid);
         playerMap[uuid] = player;
 
     }
@@ -127,7 +155,7 @@ handlerMap.createSession = async (node, packet: Packets.CreateSession) => {
 
     let dataPacket: Packets.SyncData = {
         session: packet.session,
-        stats: player.filterStats(node.account.allowedScopes)
+        stats: player.getStats(node.scopes)
     };
 
     logger.info(`Sending data of ${player.name} to ${newSession.realm}`)
@@ -143,7 +171,7 @@ handlerMap.syncData = async (node, packet: Packets.SyncData) => {
 
     if (!session) {
         logger.info(`Unable to find session ${sessionId}`)
-        return errorResponse(201, `Unable to find session ${sessionId}`)
+        return errorResponse('SEVERE', `Unable to find session ${sessionId}`)
     }
 
     let player = session.player
@@ -151,30 +179,35 @@ handlerMap.syncData = async (node, packet: Packets.SyncData) => {
 
     if (session.ownerNode != node) {
         logger.info(`${node.account.login} tried to save data for ${player.name}, but the player is on ${realm}`)
-        return errorResponse(202, `Player ${player.toString()} is connected to ${realm}`)
+        return errorResponse('WARNING', `Player ${player.toString()} is connected to ${realm}`)
     }
 
 
     // First we check access to all scopes
     for (let scope in packet.stats) {
         if (!node.account.allowedScopes.includes(scope)) {
-            return errorResponse(203, `Account ${node.account.login} doesn't have enough permissions to alter '${scope}' scope`)
+            return errorResponse('FATAL', `Account ${node.account.login} doesn't have enough permissions to alter '${scope}' scope`)
         }
     }
 
     // Then alter
-    for (let scope in packet.stats) {
-        player.stats[scope] = packet.stats[scope];
+    for (let scopeId in packet.stats) {
+        let scope = node.getScope(scopeId);
+        if (!scope) continue;
+
+        let data = packet.stats[scopeId];
+
+        player.stats[scopeId] = data;
+        try {
+            await storage.saveData(scope, player.uuid, data)
+        } catch (error) {
+            logger.error(`Error while saving ${player.name}:`, error)
+            return errorResponse('SEVERE', 'Database error')
+        }
     }
 
-    try {
-        await storage.saveStats(player.uuid, player.stats);
-        logger.info(`Realm ${session.realm} saved data for ${player.name}`);
-        return okResponse(`Saved ${player.name}`);
-    } catch (error) {
-        logger.error(`Error while saving ${player.name}:`, error)
-        return errorResponse(204, 'Database error')
-    }
+    logger.info(`Realm ${session.realm} saved data for ${player.name}`);
+    return okResponse(`Saved ${player.name}`);
 
 
 }
@@ -191,9 +224,9 @@ handlerMap.endSession = async (node, packet: Packets.EndSession) => {
     }
 
     let player = session.player;
-    
+
     delete sessionMap[sessionId]
-    
+
     if (player.currentSession == session) {
         logger.debug(`${session.realm} closed the active session ${session.sessionId} of ${player.name}`)
         delete playerMap[player.uuid]

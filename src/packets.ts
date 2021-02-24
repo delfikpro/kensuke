@@ -14,8 +14,20 @@ export type Packet = {}
 
 export type Ok = { message: string }
 
+/**
+ * FATAL errors will shut the client down
+ * Those are thrown whenever a client lacks some permissions and need to contact an admin to get them
+ * 
+ * SEVERE
+ * 
+ * WARNING
+ * 
+ * TIMEOUT
+ */
+export type ErrorLevel = 'FATAL' | 'SEVERE' | 'WARNING' | 'TIMEOUT'
+
 export type Error = {
-    errorCode: number
+    errorLevel: ErrorLevel
     errorMessage: string
 }
 
@@ -26,6 +38,10 @@ export type Auth = {
     login: string
     password: string
     nodeName: string
+}
+
+export type UseScopes = {
+    scopes: string[]
 }
 
 /**

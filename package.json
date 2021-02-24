@@ -1,11 +1,11 @@
 {
   "name": "stats-service",
   "dependencies": {
+    "@types/mongodb": "^3.6.8",
     "@types/node": "^14.14.14",
     "@types/uuid": "^8.3.0",
     "logform": "^2.2.0",
-    "mongodb": "^3.6.3",
-    "mongoose": "^5.10.17",
+    "mongodb": "^3.6.4",
     "uuid": "^8.3.2",
     "winston": "^3.3.3",
     "ws": "^7.4.1"
