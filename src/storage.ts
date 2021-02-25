@@ -1,3 +1,4 @@
+import { access } from 'fs';
 import * as mongodb from 'mongodb';
 import { logger } from '.';
 import { hashPassword } from './authorization'
@@ -27,7 +28,7 @@ export interface StatStorage {
 }
 
 export type Account = {
-    login: string,
+    id: string,
     allowedScopes: string[],
     passwordHash: string
 };
@@ -68,7 +69,11 @@ export async function init(): Promise<StatStorage> {
 class StatStorageImpl implements StatStorage {
 
     scopes: ScopeWrapper[]
+    scopesCollection: mongodb.Collection
+
     accounts: Account[]
+    accountsCollection: mongodb.Collection
+
     db: mongodb.Db;
 
 
@@ -82,19 +87,33 @@ class StatStorageImpl implements StatStorage {
 
         await client.connect()
 
+        this.db = client.db()
+
         await this.reloadScopes();
         await this.reloadAccounts();
 
-        this.db = client.db()
 
     }
 
-    async reloadScopes(): Promise<void> {
+    async ensureCollectionExists(name: string, indexOptions?: mongodb.IndexOptions): Promise<mongodb.Collection> {
 
-        let collection = await this.db.createCollection('scopes')
-        await collection.createIndex({ id: 1 }, { unique: true })
+        let existing = await this.db.listCollections({name: 'scopes'}).next()
+        if (existing) {
+            return this.db.collection(name);
+        }
+
+        let collection = await this.db.createCollection(name)
+        await collection.createIndex({ id: 1 }, indexOptions || { unique: true })
+        return collection
+        
+    }
+
+    async reloadScopes(): Promise<void> {
+        
         this.scopes = []
-        let scopes: Scope[] = await collection.find().toArray()
+        this.scopesCollection = await this.ensureCollectionExists('scopes')
+
+        let scopes: Scope[] = await this.scopesCollection.find().toArray()
 
         for (let scope of scopes) {
             this.scopes.push(await this.loadScope(scope))
@@ -105,15 +124,14 @@ class StatStorageImpl implements StatStorage {
     }
 
     async loadScope(scope: Scope): Promise<ScopeWrapper> {
-        let collection = await this.db.createCollection(scope.id)
+        let collection = await this.ensureCollectionExists(scope.id)
         return { collection, scope }
     }
 
     async reloadAccounts(): Promise<void> {
 
-        let collection = await this.db.createCollection('accounts')
-        await collection.createIndex({ login: 1 }, { unique: true })
-        this.accounts = await collection.find().toArray()
+        this.accountsCollection = await this.ensureCollectionExists('accounts')
+        this.accounts = await this.accountsCollection.find().toArray()
 
         logger.info(`Loaded ${this.accounts.length} accounts.`)
 
@@ -121,7 +139,7 @@ class StatStorageImpl implements StatStorage {
 
     getAccount(id: string): Account {
         for (let account of this.accounts) {
-            if (account.login == id) return account;
+            if (account.id == id) return account;
         }
     }
 
@@ -132,7 +150,7 @@ class StatStorageImpl implements StatStorage {
         if (this.getAccount(id)) throw Error(`Account ${id} already exists`)
 
         let account: Account = {
-            login: id,
+            id: id,
             passwordHash: hashPassword(password),
             allowedScopes: []
         }
@@ -145,20 +163,20 @@ class StatStorageImpl implements StatStorage {
 
     async registerScope(id: string, owner: Account): Promise<Scope> {
 
-        logger.info(`Registering scope ${id} for ${owner.login}...`)
+        logger.info(`Registering scope ${id} for ${owner.id}...`)
 
-        if (!id.match(/^\$[A-Za-z_-]+$/)) throw Error("Malformed scope name");
+        if (!id.match(/^(players|arbitrary):[A-Za-z_-]+$/)) throw Error("Malformed scope name");
 
         if (this.getScope(id) != null) throw Error(`Scope ${id} already exists`)
 
         owner.allowedScopes.push(id)
-        await this.db.collection('accounts').updateOne({ login: owner.login }, owner)
+        await this.db.collection('accounts').replaceOne({ id: owner.id }, owner)
 
-        let collection = await this.db.createCollection(id);
+        let collection = await this.ensureCollectionExists(id);
 
         let scope = {
             id, 
-            createdBy: owner.login,
+            createdBy: owner.id,
             createdAt: Date.now()
         }
 
@@ -168,7 +186,7 @@ class StatStorageImpl implements StatStorage {
 
         this.scopes.push(scopeWrapper);
 
-        logger.info(`Successfully registered scope ${id} for ${owner.login}`)
+        logger.info(`Successfully registered scope ${id} for ${owner.id}`)
 
         return scope;
 
@@ -196,7 +214,7 @@ class StatStorageImpl implements StatStorage {
 
         let scopeWrapper = this.getScopeWrapper(scope.id);
         if (!scopeWrapper) throw Error(`Unknown scope ${scope.id}`)
-        await scopeWrapper.collection.updateOne({ id }, { id, ...data }, {
+        await scopeWrapper.collection.replaceOne({ id }, { id, ...data }, {
             upsert: true
         })
 

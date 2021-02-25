@@ -34,10 +34,17 @@ export const logger = winston.createLogger({
     ]
 });
 
+var nodes: MinecraftNode[] = [];
 
 initStorage().then($storage => {
 
     storage = $storage;
+
+    setInterval(() => {
+        for (let node of nodes) {
+            node.sendPacket(['keepAlive', {}])
+        }
+    }, 5000)
     
     const wss = new WebSocket.Server({ port: +process.env.PORT || 8999 });
     logger.info('Ready!')
@@ -60,14 +67,19 @@ initStorage().then($storage => {
             for (let session of activeSessions) {
                 delete sessionMap[session.sessionId]
                 delete playerMap[session.player.uuid]
-                console.log(`Abrupt restart caused session ${session.sessionId} of ${session.player.name} to end.`)
+                logger.warn(`Abrupt restart caused session ${session.sessionId} of ${session.player.name} to end.`)
             }
-        })
+            let index = nodes.indexOf(node)
+            if (index >= 0) nodes.splice(index, 1)
+        });
+
+        nodes.push(node);
     
         ws.on('message', async (message: string) => {
     
             let response: Sendable<object>;
             let frame: Packets.Frame;
+            logger.debug(message)
     
             try {
                 frame = JSON.parse(message);

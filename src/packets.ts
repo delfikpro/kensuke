@@ -31,6 +31,10 @@ export type Error = {
     errorMessage: string
 }
 
+export type KeepAlive = {
+    
+}
+
 /**
  * Auth packet is the first packet sent by statservice clients
  */

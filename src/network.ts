@@ -31,7 +31,7 @@ export class MinecraftNode {
     }
 
     toString(): string {
-        return this.account.login
+        return this.name
     }
 
     sendRequest(sendable: Sendable<Packets.Packet>): Promise<Packets.Frame> {

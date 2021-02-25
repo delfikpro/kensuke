@@ -40,7 +40,11 @@ export class Player {
         let stats: Stats = {};
         for (let scope of scopes) {
             let s = this.stats[scope.id];
-            stats[scope.id] = s || await storage.readData(scope, this.uuid)
+            if (!s) {
+                s = await storage.readData(scope, this.uuid);
+                this.stats[scope.id] = s;
+            }
+            stats[scope.id] = s
         }
         return stats;
     }
@@ -71,7 +75,7 @@ export const handlerMap: Record<string, (node: MinecraftNode, packet: any) => Pr
 handlerMap.auth = async (node, packet: Packets.Auth) => {
 
     if (node.account)
-        return errorResponse('WARNING', `Already authorized as ${node.account.login}.`)
+        return errorResponse('WARNING', `Already authorized as ${node.account.id}.`)
 
     let account = storage.getAccount(packet.login);
 
@@ -80,9 +84,9 @@ handlerMap.auth = async (node, packet: Packets.Auth) => {
 
     node.account = account;
 
-    logger.info(`${account.login} authorized.`)
+    logger.info(`${account.id} authorized.`)
 
-    return okResponse(`Successfully authorized as ${account.login}`);
+    return okResponse(`Successfully authorized as ${account.id}`);
 
 };
 
@@ -103,6 +107,8 @@ handlerMap.useScopes = async (node, packet: Packets.UseScopes) => {
 
         node.scopes.push(scope)
     }
+
+    return okResponse("All ok.")
 
 }
 
@@ -155,7 +161,7 @@ handlerMap.createSession = async (node, packet: Packets.CreateSession) => {
 
     let dataPacket: Packets.SyncData = {
         session: packet.session,
-        stats: player.getStats(node.scopes)
+        stats: await player.getStats(node.scopes)
     };
 
     logger.info(`Sending data of ${player.name} to ${newSession.realm}`)
@@ -178,7 +184,7 @@ handlerMap.syncData = async (node, packet: Packets.SyncData) => {
     let realm = session.realm
 
     if (session.ownerNode != node) {
-        logger.info(`${node.account.login} tried to save data for ${player.name}, but the player is on ${realm}`)
+        logger.info(`${node.account.id} tried to save data for ${player.name}, but the player is on ${realm}`)
         return errorResponse('WARNING', `Player ${player.toString()} is connected to ${realm}`)
     }
 
@@ -186,14 +192,17 @@ handlerMap.syncData = async (node, packet: Packets.SyncData) => {
     // First we check access to all scopes
     for (let scope in packet.stats) {
         if (!node.account.allowedScopes.includes(scope)) {
-            return errorResponse('FATAL', `Account ${node.account.login} doesn't have enough permissions to alter '${scope}' scope`)
+            return errorResponse('FATAL', `Account ${node.account.id} doesn't have enough permissions to alter '${scope}' scope`)
         }
     }
 
     // Then alter
     for (let scopeId in packet.stats) {
         let scope = node.getScope(scopeId);
-        if (!scope) continue;
+        if (!scope) {
+            logger.warn(`${node.name} tried to save data for non-locked scope ${scopeId}`)
+            continue;
+        }
 
         let data = packet.stats[scopeId];
 
