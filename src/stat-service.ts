@@ -221,6 +221,10 @@ handlerMap.syncData = async (node, packet: Packets.SyncData) => {
 
 }
 
+handlerMap.requestLeaderboard = async (node, packet: Packets.RequestLeaderboard) => {
+    return ['leaderboardState', await storage.getLeaderboard(storage.getScope(packet.scope), packet.field, packet.limit)]
+}
+
 handlerMap.endSession = async (node, packet: Packets.EndSession) => {
 
     let sessionId = packet.session;

@@ -48,6 +48,16 @@ export type UseScopes = {
     scopes: string[]
 }
 
+export type RequestLeaderboard = {
+    scope: string
+    field: string
+    limit: number
+}
+
+export type LeaderboardState = {
+    entries: any[]
+}
+
 /**
  * When a player attempts to join a realm, a session is created.
  * Session id is used to synchronize the data between statservice and minecraft servers

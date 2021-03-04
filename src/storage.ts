@@ -25,6 +25,8 @@ export interface StatStorage {
 
     saveData(scope: Scope, id: string, data: Object): Promise<void>;
 
+    getLeaderboard(scope: Scope, field: string, limit: number): Promise<any[]>;
+
 }
 
 export type Account = {
@@ -217,6 +219,15 @@ class StatStorageImpl implements StatStorage {
         await scopeWrapper.collection.replaceOne({ id }, { id, ...data }, {
             upsert: true
         })
+
+    }
+
+    async getLeaderboard(scope: Scope, field: string, limit: number): Promise<any[]> {
+
+        let scopeWrapper = this.getScopeWrapper(scope.id);
+        if (!scopeWrapper) throw Error(`Unknown scope ${scope.id}`)
+
+        return await scopeWrapper.collection.aggregate([{$sort: {field: 1}}, {$limit: limit}]).toArray()
 
     }
 
