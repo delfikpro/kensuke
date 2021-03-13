@@ -18,5 +18,4 @@ jobs:
         with:
           node-version: '15'
       - run: yarn
-      - run: yarn build
       - run: yarn lint
