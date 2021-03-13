@@ -1,6 +1,6 @@
 {
   "name": "stats-service",
-  "main": "dist/server",
+  "main": "./dist/server/index.js",
   "_moduleAliases": {
     "@": "src"
   },
@@ -11,7 +11,7 @@
     "fmt": "eslint --fix .",
     "dev": "NODE_ENV=development ts-node src/",
     "start": "NODE_ENV=production node ./dist/",
-    "build": "tsc --project tsconfig.json && tscpaths -p tsconfig.json -s ./src -o ./dist"
+    "build": "tsc --project tsconfig.json --incremental && tscpaths -p tsconfig.json -s ./src -o ./dist/server"
   },
   "dependencies": {
     "dotenv": "^8.2.0",

@@ -1,1 +1,1 @@
-echo Compiling... && yarn tsc --incremental && echo Launching... && yarn node ./dist/server/index.js
+echo Compiling... && yarn build && echo Launching... && yarn node ./dist/server/index.js
