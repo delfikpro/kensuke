@@ -1,13 +1,26 @@
 {
-    "compilerOptions": {
-        "incremental": true,
-        "target": "es6",
-        "module": "commonjs",
-        "outDir": "./dist/server"
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "CommonJS",
+    "outDir": "./dist/server",
+    "rootDir": "./src",
+    "strict": false,
+    "noImplicitAny": true,
+    "moduleResolution": "node",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
     },
-    "exclude": [
-        "dist",
-        "node_modules"
+    "types": [
+      "node"
     ],
-    "include": ["./src"]
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true
+  },
+  "include": ["src"],
+  "exclude": ["dist", "node_modules"]
 }
