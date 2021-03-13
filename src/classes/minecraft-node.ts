@@ -1,14 +1,17 @@
 import { v4 as randomUUID } from 'uuid';
 
-import { Account, MinecraftWebSocket, Scope, Sendable } from '@/types';
-import * as Packets from '@/types/packets';
+import {
+    Account,
+    MinecraftWebSocket,
+    Scope,
+    Sendable,
+    Frame,
+    Packet,
+} from '@/types';
 
 export const timeout = +process.env.STATSERVICE_TIMEOUT || 5000;
 
-export const runningRequests: Record<
-    string,
-    (frame: Packets.Frame) => void
-> = {};
+export const runningRequests: Record<string, (frame: Frame) => void> = {};
 
 export class MinecraftNode {
     isAlive = true;
@@ -24,14 +27,14 @@ export class MinecraftNode {
         return this.name;
     }
 
-    sendRequest(sendable: Sendable<Packets.Packet>): Promise<Packets.Frame> {
-        const frame: Packets.Frame = {
+    sendRequest(sendable: Sendable<Packet>): Promise<Frame> {
+        const frame: Frame = {
             type: sendable[0],
             data: sendable[1],
             uuid: randomUUID(),
         };
 
-        return new Promise<Packets.Frame>(resolve => {
+        return new Promise<Frame>(resolve => {
             const wait = setTimeout(() => {
                 delete runningRequests[frame.uuid];
                 resolve({
@@ -50,8 +53,8 @@ export class MinecraftNode {
         });
     }
 
-    sendPacket(sendable: Sendable<Packets.Packet>): void {
-        const frame: Packets.Frame = {
+    sendPacket(sendable: Sendable<Packet>): void {
+        const frame: Frame = {
             type: sendable[0],
             data: sendable[1],
         };
@@ -59,7 +62,7 @@ export class MinecraftNode {
         this.sendFrame(frame);
     }
 
-    sendFrame(frame: Packets.Frame): void {
+    sendFrame(frame: Frame): void {
         this.socket.send(JSON.stringify(frame));
     }
 

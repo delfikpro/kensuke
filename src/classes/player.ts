@@ -1,4 +1,4 @@
-import { Session } from '@/classes/session';
+import { Session } from '@/classes';
 import { Scope, Stats } from '@/types';
 import { getStorage } from '@/helpers';
 

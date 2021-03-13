@@ -1,12 +1,12 @@
 import { Sendable } from '@/types';
-import * as Packets from '@/types/packets';
+import { Ok, Error, ErrorLevel } from '@/types/packets';
 
-export function okResponse(message: string): Sendable<Packets.Ok> {
+export function okResponse(message: string): Sendable<Ok> {
     return ['ok', { message }];
 }
 export function errorResponse(
-    errorLevel: Packets.ErrorLevel,
+    errorLevel: ErrorLevel,
     errorMessage: string,
-): Sendable<Packets.Error> {
+): Sendable<Error> {
     return ['error', { errorLevel, errorMessage }];
 }

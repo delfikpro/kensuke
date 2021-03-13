@@ -1,8 +1,8 @@
 import { Collection, Db, MongoClient, IndexOptions } from 'mongodb';
 
 import { logger, hashPassword } from '@/helpers';
-import { Stats, Account, Scope } from '@/types/types';
-import { ScopeWrapper } from '@/classes/index';
+import { Stats, Account, Scope } from '@/types';
+import { ScopeWrapper } from '@/classes';
 
 export class StatStorage {
     scopes: ScopeWrapper[];

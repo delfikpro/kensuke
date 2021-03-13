@@ -1,20 +1,34 @@
-import { Session, Player } from '@/classes';
-import * as Packets from '@/types/packets';
+import { MinecraftNode, Player, Session } from '@/classes';
 import {
-    logger,
+    Auth,
+    CreateSession,
+    UseScopes,
+    Error,
+    SyncData,
+    RequestLeaderboard,
+    EndSession,
+} from '@/types/packets';
+import {
+    asError,
+    errorResponse,
     getStorage,
     hashPassword,
+    logger,
+    okResponse,
     playerMap,
     sessionMap,
-    handlerMap,
-    okResponse,
-    errorResponse,
-    asError,
 } from '@/helpers';
 
-const storage = getStorage();
+/*
+Record<
+    string,
+    (node: MinecraftNode, packet: any) => Promise<Sendable<Record<any, any>>>
+>
+ */
 
-handlerMap.auth = async (node, packet: Packets.Auth) => {
+export function auth(node: MinecraftNode, packet: Auth) {
+    const storage = getStorage();
+
     if (node.account)
         return errorResponse(
             'WARNING',
@@ -31,9 +45,11 @@ handlerMap.auth = async (node, packet: Packets.Auth) => {
     logger.info(`${account.id} authorized.`);
 
     return okResponse(`Successfully authorized as ${account.id}`);
-};
+}
 
-handlerMap.useScopes = async (node, packet: Packets.UseScopes) => {
+export async function useScopes(node: MinecraftNode, packet: UseScopes) {
+    const storage = getStorage();
+
     for (const scopeId of packet.scopes) {
         if (node.getScope(scopeId)) continue;
 
@@ -53,9 +69,12 @@ handlerMap.useScopes = async (node, packet: Packets.UseScopes) => {
     }
 
     return okResponse('All ok.');
-};
+}
 
-handlerMap.createSession = async (node, packet: Packets.CreateSession) => {
+export async function createSession(
+    node: MinecraftNode,
+    packet: CreateSession,
+) {
     const existingSession = sessionMap[packet.session];
     if (existingSession) {
         logger.warn(
@@ -91,9 +110,9 @@ handlerMap.createSession = async (node, packet: Packets.CreateSession) => {
                 logger.info(
                     `${oldSession.realm} failed to save data for ${
                         player.name
-                    }: ${(response.data as Packets.Error).errorMessage}`,
+                    }: ${(response.data as Error).errorMessage}`,
                 );
-                throw asError(response.data as Packets.Error);
+                throw asError(response.data as Error);
             }
         }
     } else {
@@ -112,7 +131,7 @@ handlerMap.createSession = async (node, packet: Packets.CreateSession) => {
 
     player.currentSession = newSession;
 
-    const dataPacket: Packets.SyncData = {
+    const dataPacket: SyncData = {
         session: packet.session,
         stats: await player.getStats(node.scopes),
     };
@@ -120,11 +139,12 @@ handlerMap.createSession = async (node, packet: Packets.CreateSession) => {
     logger.info(`Sending data of ${player.name} to ${newSession.realm}`);
 
     return ['syncData', dataPacket];
-};
+}
 
-handlerMap.syncData = async (node, packet: Packets.SyncData) => {
+export async function syncData(node: MinecraftNode, packet: SyncData) {
+    const storage = getStorage();
+
     const sessionId = packet.session;
-
     const session = sessionMap[sessionId];
 
     if (!session) {
@@ -178,12 +198,14 @@ handlerMap.syncData = async (node, packet: Packets.SyncData) => {
 
     logger.info(`Realm ${session.realm} saved data for ${player.name}`);
     return okResponse(`Saved ${player.name}`);
-};
+}
 
-handlerMap.requestLeaderboard = async (
-    node,
-    packet: Packets.RequestLeaderboard,
-) => {
+export async function requestLeaderboard(
+    node: MinecraftNode,
+    packet: RequestLeaderboard,
+) {
+    const storage = getStorage();
+
     return [
         'leaderboardState',
         {
@@ -194,9 +216,9 @@ handlerMap.requestLeaderboard = async (
             ),
         },
     ];
-};
+}
 
-handlerMap.endSession = async (node, packet: Packets.EndSession) => {
+export async function endSession(node: MinecraftNode, packet: EndSession) {
     const sessionId = packet.session;
 
     const session = sessionMap[sessionId];
@@ -224,4 +246,4 @@ handlerMap.endSession = async (node, packet: Packets.EndSession) => {
     }
 
     return okResponse('Ok');
-};
+}
