@@ -14,7 +14,7 @@ export class StatStorage {
     db: Db;
 
     static async init(): Promise<StatStorage> {
-        /*const requiredVariables = ['MONGO_URL', 'MONGO_USER', 'MONGO_PASSWORD'];
+        const requiredVariables = ['MONGO_URL', 'MONGO_USER', 'MONGO_PASSWORD'];
         const env = process.env as Record<string, any>;
 
         for (const variable of requiredVariables) {
@@ -24,17 +24,10 @@ export class StatStorage {
 
         const storage = new StatStorage();
 
-        /*await storage.connect(
+        await storage.connect(
             env.MONGO_URL,
             env.MONGO_USER,
             env.MONGO_PASSWORD,
-        );*/
-        const storage = new StatStorage();
-
-        await storage.connect(
-            'mongodb://root:optimisticNihilism@mustard.implario.dev/admin',
-            'root',
-            'optimisticNihilism',
         );
 
         return storage;
