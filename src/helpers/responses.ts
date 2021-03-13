@@ -1,5 +1,4 @@
-import { Sendable } from '@/types';
-import { Ok, Error, ErrorLevel } from '@/types/packets';
+import { Sendable, Ok, Error, ErrorLevel } from '@/types';
 
 export function okResponse(message: string): Sendable<Ok> {
     return ['ok', { message }];

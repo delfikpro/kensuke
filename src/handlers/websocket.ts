@@ -15,11 +15,11 @@ import {
     StatStorage,
 } from '@/classes';
 import { MinecraftWebSocket, Sendable, Frame } from '@/types';
-import * as handlers from '@/handlers';
+import * as messageHandlers from '@/handlers/message';
 
 const nodes: MinecraftNode[] = [];
 
-export function websocketHandler($storage: StatStorage) {
+export function websocket($storage: StatStorage) {
     setStorage($storage);
 
     setInterval(() => {
@@ -85,7 +85,7 @@ export function websocketHandler($storage: StatStorage) {
 
             try {
                 // @ts-ignore TODO: fix it как нибудь
-                const handle = handlers[frame.type];
+                const handle = messageHandlers[frame.type];
 
                 if (frame.type != 'auth' && !node.account)
                     response = errorResponse('FATAL', 'Unauthorized');
