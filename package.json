@@ -10,8 +10,8 @@
   "scripts": {
     "fmt": "eslint --fix .",
     "dev": "NODE_ENV=development ts-node src/",
-    "start": "NODE_ENV=production node ./build/",
-    "build": "tsc --project tsconfig.json && tscpaths -p tsconfig.json -s ./src -o ./build"
+    "start": "NODE_ENV=production node ./dist/",
+    "build": "tsc --project tsconfig.json && tscpaths -p tsconfig.json -s ./src -o ./dist"
   },
   "dependencies": {
     "dotenv": "^8.2.0",
