@@ -9,6 +9,7 @@
   },
   "scripts": {
     "fmt": "eslint --fix .",
+    "lint": "eslint  .",
     "dev": "NODE_ENV=development ts-node src/",
     "start": "NODE_ENV=production node ./dist/",
     "build": "tsc --project tsconfig.json --incremental && tscpaths -p tsconfig.json -s ./src -o ./dist/server"
