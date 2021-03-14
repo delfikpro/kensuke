@@ -2,7 +2,7 @@ import { Session } from '@/classes';
 import { Scope, Stats } from '@/types';
 import { getStorage } from '@/helpers';
 
-const storage = getStorage();
+//const storage = getStorage();
 
 export class Player {
     currentSession: Session;
@@ -15,7 +15,7 @@ export class Player {
         for (const scope of scopes) {
             let s = this.stats[scope.id];
             if (!s) {
-                s = await storage.readData(scope, this.uuid);
+                s = await getStorage().readData(scope, this.uuid);
                 this.stats[scope.id] = s;
             }
             stats[scope.id] = s;
