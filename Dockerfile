@@ -9,6 +9,6 @@ WORKDIR /app
 
 COPY . ./
 
-RUN yarn && yarn tsc
+RUN yarn && yarn build
 
 CMD [ "yarn", "node", "./dist/server/index.js" ]
