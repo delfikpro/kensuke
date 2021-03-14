@@ -188,7 +188,7 @@ export class StatStorage {
         if (!scopeWrapper) throw Error(`Unknown scope ${scope.id}`);
 
         return await scopeWrapper.collection
-            .aggregate([{ $sort: { field: 1 } }, { $limit: limit }])
+            .aggregate([{ $sort: { [field]: -1 } }, { $limit: limit }])
             .toArray();
     }
 }
