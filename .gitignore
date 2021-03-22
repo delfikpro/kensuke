@@ -8,4 +8,5 @@
 logs
 dist
 
-start.sh
+start-env.sh
+test.txt
