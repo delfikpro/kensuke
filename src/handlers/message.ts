@@ -106,7 +106,7 @@ export async function createSession(
             ]);
 
             // ToDo: Timeout errors probably shouldn't prevent logins
-            if (response.type == 'error') {
+            if (response.type == 'error' && (response.data as Error).errorLevel != 'WARNING') {
                 logger.info(
                     `${oldSession.realm} failed to save data for ${
                         player.name
