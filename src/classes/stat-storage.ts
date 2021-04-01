@@ -120,7 +120,7 @@ export class StatStorage {
         if (!id.match(/^(players|arbitrary):[A-Za-z_-]+$/))
             throw Error('Malformed scope name');
 
-        if (this.getScope(id) !== null)
+        if (this.getScope(id))
             throw Error(`Scope ${id} already exists`);
 
         owner.allowedScopes.push(id);
