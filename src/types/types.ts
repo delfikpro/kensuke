@@ -21,10 +21,7 @@ export type Scope = {
     createdAt: number;
 };
 
-export type Sendable<T extends Record<any, any>> = [
-    packetClass: string,
-    data: T,
-];
+export type Sendable<T extends Record<any, any>> = [packetClass: string, data: T];
 
 export interface MinecraftWebSocket extends WebSocket {
     minecraftNode: MinecraftNode;

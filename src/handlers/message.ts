@@ -197,7 +197,7 @@ export async function requestSnapshot(node: MinecraftNode, packet: RequestSnapsh
 
     for (const scope of packet.scopes) {
         if (!node.account.allowedScopes.includes(scope)) {
-            return errorResponse('SEVERE', `You don't have permission to request ${scope} scope`);
+            return errorResponse('FATAL', `You don't have permission to request ${scope} scope`);
         }
         scopes.push(node.getScope(scope));
     }

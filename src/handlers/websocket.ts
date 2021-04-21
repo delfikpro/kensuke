@@ -49,7 +49,7 @@ export function websocket($storage: StatStorage) {
         ws.on('message', async (message: string) => {
             let response: Sendable<Record<any, any>>;
             let frame: Frame;
-            logger.debug(message);
+            // logger.debug(message);
 
             try {
                 frame = JSON.parse(message);
@@ -76,7 +76,6 @@ export function websocket($storage: StatStorage) {
                 else if (handle) response = await handle(node, frame.data);
             } catch (error) {
                 response = errorResponse('SEVERE', 'Internal error');
-                logger.warn(error);
             }
 
             if (frame.uuid) {
@@ -85,7 +84,13 @@ export function websocket($storage: StatStorage) {
             }
 
             if (response) {
-                logger.debug('Sending %s to node %s', JSON.stringify(response), node.toString());
+                if (response[0] == 'error') {
+                    node.log(`Processing ${frame.type} packet resulted in an error`, 'warn');
+                    node.log('Request: ' + JSON.stringify(frame), 'warn');
+                    node.log('Response: ' + JSON.stringify(response[1]), 'warn');
+                }
+
+                // logger.debug('Sending %s to node %s', JSON.stringify(response), node.toString());
                 node.sendFrame({
                     type: response[0],
                     data: response[1],
