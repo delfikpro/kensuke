@@ -1,4 +1,4 @@
-import { Stats } from '@/types/index';
+import { KensukeData } from '@/types/index';
 
 export type UUID = string;
 
@@ -81,7 +81,7 @@ export type EndSession = {
  */
 export type SyncData = {
     session: UUID;
-    stats: Stats;
+    stats: KensukeData;
 };
 
 /**
@@ -90,4 +90,18 @@ export type SyncData = {
  */
 export type RequestSync = {
     session: UUID;
+};
+
+/**
+ * Kensuke clients can request data snapshots without attaching the mutex.
+ */
+export type RequestSnapshot = {
+    id: UUID;
+    scopes: string[];
+};
+
+export type DataSnapshot = {
+    id: UUID;
+    name: string;
+    stats: KensukeData;
 };
