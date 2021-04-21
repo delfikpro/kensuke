@@ -76,6 +76,7 @@ export function websocket($storage: StatStorage) {
                 else if (handle) response = await handle(node, frame.data);
             } catch (error) {
                 response = errorResponse('SEVERE', 'Internal error');
+                logger.error('Internal error', error);
             }
 
             if (frame.uuid) {
