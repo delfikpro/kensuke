@@ -158,7 +158,7 @@ export async function syncData(node: MinecraftNode, packet: SyncData) {
 export async function requestLeaderboard(node: MinecraftNode, packet: RequestLeaderboard) {
     const storage = getStorage();
 
-    node.log(`Generating leaderboard for ${packet.scope} with the limit of ${packet.limit}`);
+    node.log(`Generating leaderboard for ${packet.scope} by ${packet.field} with the limit of ${packet.limit}`);
 
     const start = Date.now();
 
@@ -166,7 +166,7 @@ export async function requestLeaderboard(node: MinecraftNode, packet: RequestLea
 
     const end = Date.now();
 
-    node.log(`Leaderboard generation for ${packet.scope} took ${end - start} ms.`);
+    node.log(`Leaderboard generation for ${packet.scope} by ${packet.field} took ${end - start} ms.`);
 
     return ['leaderboardState', { entries }];
 }
