@@ -192,8 +192,7 @@ export async function endSession(node: MinecraftNode, packet: EndSession) {
 export async function requestSnapshot(node: MinecraftNode, packet: RequestSnapshot) {
     const scopes: Scope[] = [];
 
-    node.log(`Requested data snapshot for ${packet.id} in \
-            ${packet.scopes.join(', ')}`);
+    node.log(`Requested data snapshot for ${packet.id} in ${packet.scopes.join(', ')}`);
 
     for (const scope of packet.scopes) {
         if (!node.account.allowedScopes.includes(scope)) {
