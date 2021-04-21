@@ -1,17 +1,17 @@
 import { Session } from '@/classes';
-import { Scope, Stats } from '@/types';
+import { Scope, KensukeData } from '@/types';
 import { getStorage } from '@/helpers';
 
 //const storage = getStorage();
 
 export class Player {
     currentSession: Session;
-    stats: Stats = {};
+    stats: KensukeData = {};
 
     constructor(public readonly uuid: string, public name: string) {}
 
-    async getStats(scopes: Scope[]): Promise<Stats> {
-        const stats: Stats = {};
+    async getStats(scopes: Scope[]): Promise<KensukeData> {
+        const stats: KensukeData = {};
         for (const scope of scopes) {
             let s = this.stats[scope.id];
             if (!s) {

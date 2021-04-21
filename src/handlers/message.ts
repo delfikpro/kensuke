@@ -1,23 +1,7 @@
 import { MinecraftNode, Player, Session } from '@/classes';
-import {
-    Auth,
-    CreateSession,
-    UseScopes,
-    Error,
-    SyncData,
-    RequestLeaderboard,
-    EndSession,
-} from '@/types/packets';
-import {
-    asError,
-    errorResponse,
-    getStorage,
-    hashPassword,
-    logger,
-    okResponse,
-    playerMap,
-    sessionMap,
-} from '@/helpers';
+import { Auth, CreateSession, UseScopes, Error, SyncData, RequestLeaderboard, EndSession, RequestSnapshot } from '@/types/packets';
+import { Scope } from '@/types/types';
+import { asError, errorResponse, getStorage, hashPassword, logger, okResponse, playerMap, sessionMap } from '@/helpers';
 
 /*
 Record<
@@ -29,20 +13,16 @@ Record<
 export function auth(node: MinecraftNode, packet: Auth) {
     const storage = getStorage();
 
-    if (node.account)
-        return errorResponse(
-            'WARNING',
-            `Already authorized as ${node.account.id}.`,
-        );
+    if (node.account) return errorResponse('WARNING', `Already authorized as ${node.account.id}.`);
 
     const account = storage.getAccount(packet.login);
 
-    if (!account || account.passwordHash !== hashPassword(packet.password))
-        return errorResponse('FATAL', `Invalid credentials`);
+    if (!account || account.passwordHash !== hashPassword(packet.password)) return errorResponse('FATAL', `Invalid credentials`);
 
     node.account = account;
+    node.nodeName = packet.nodeName;
 
-    logger.info(`${account.id} authorized.`);
+    node.log('Node authorized as ' + account.id);
 
     return okResponse(`Successfully authorized as ${account.id}`);
 }
@@ -59,10 +39,7 @@ export async function useScopes(node: MinecraftNode, packet: UseScopes) {
         }
 
         if (!node.account.allowedScopes.includes(scopeId)) {
-            return errorResponse(
-                'FATAL',
-                `Not enough permissions to use ${scopeId} scope`,
-            );
+            return errorResponse('FATAL', `Not enough permissions to use ${scopeId} scope`);
         }
 
         node.scopes.push(scope);
@@ -71,15 +48,10 @@ export async function useScopes(node: MinecraftNode, packet: UseScopes) {
     return okResponse('All ok.');
 }
 
-export async function createSession(
-    node: MinecraftNode,
-    packet: CreateSession,
-) {
+export async function createSession(node: MinecraftNode, packet: CreateSession) {
     const existingSession = sessionMap[packet.session];
     if (existingSession) {
-        logger.warn(
-            `${packet.realm} tried to create an existing session: ${packet.session}`,
-        );
+        logger.warn(`${packet.realm} tried to create an existing session: ${packet.session}`);
         return errorResponse('SEVERE', 'Session already exists');
     }
 
@@ -92,35 +64,22 @@ export async function createSession(
         const oldSession = player.currentSession;
 
         if (!oldSession?.active) {
-            logger.warn(
-                `Player ${player.name} wasn't removed upon leaving the network. This is probably a bug.`,
-            );
+            node.log(`Player ${player.name} wasn't removed upon leaving the network. This is probably a bug.`, 'warn');
         } else {
-            logger.info(
-                `Player ${player.name} connected to ${packet.realm}, asking ${oldSession.realm} to synchronize stats...`,
-            );
+            node.log(`Player ${player.name} connected to ${packet.realm}, asking ${oldSession.realm} to synchronize stats...`);
 
-            const response = await oldSession.ownerNode.sendRequest([
-                'requestSync',
-                { session: oldSession.sessionId },
-            ]);
+            const response = await oldSession.ownerNode.sendRequest(['requestSync', { session: oldSession.sessionId }]);
 
             // ToDo: Timeout errors probably shouldn't prevent logins
             if (response.type == 'error' && (response.data as Error).errorLevel != 'WARNING') {
-                logger.info(
-                    `${oldSession.realm} failed to save data for ${
-                        player.name
-                    }: ${(response.data as Error).errorMessage}`,
-                );
+                node.log(`${oldSession.realm} failed to save data for ${player.name}: ${(response.data as Error).errorMessage}`);
                 throw asError(response.data as Error);
             }
         }
     } else {
         player = new Player(uuid, packet.username);
 
-        logger.info(
-            `Player ${player.name} joined the network on ${packet.realm}`,
-        );
+        node.log(`Player ${player.name} joined the network on ${packet.realm}`);
 
         playerMap[uuid] = player;
     }
@@ -136,7 +95,7 @@ export async function createSession(
         stats: await player.getStats(node.scopes),
     };
 
-    logger.info(`Sending data of ${player.name} to ${newSession.realm}`);
+    node.log(`Sending data of ${player.name} to ${newSession.realm}`);
 
     return ['syncData', dataPacket];
 }
@@ -148,7 +107,7 @@ export async function syncData(node: MinecraftNode, packet: SyncData) {
     const session = sessionMap[sessionId];
 
     if (!session) {
-        logger.info(`Unable to find session ${sessionId}`);
+        node.log(`Unable to find session ${sessionId}`);
         return errorResponse('SEVERE', `Unable to find session ${sessionId}`);
     }
 
@@ -156,22 +115,14 @@ export async function syncData(node: MinecraftNode, packet: SyncData) {
     const realm = session.realm;
 
     if (session.ownerNode != node) {
-        logger.info(
-            `${node.account.id} tried to save data for ${player.name}, but the player is on ${realm}`,
-        );
-        return errorResponse(
-            'WARNING',
-            `Player ${player.toString()} is connected to ${realm}`,
-        );
+        node.log(`${node.account.id} tried to save data for ${player.name}, but the player is on ${realm}`);
+        return errorResponse('WARNING', `Player ${player.toString()} is connected to ${realm}`);
     }
 
     // First we check access to all scopes
     for (const scope in packet.stats) {
         if (!node.account.allowedScopes.includes(scope)) {
-            return errorResponse(
-                'FATAL',
-                `Account ${node.account.id} doesn't have enough permissions to alter '${scope}' scope`,
-            );
+            return errorResponse('FATAL', `Account ${node.account.id} doesn't have enough permissions to alter '${scope}' scope`);
         }
     }
 
@@ -179,9 +130,7 @@ export async function syncData(node: MinecraftNode, packet: SyncData) {
     for (const scopeId in packet.stats) {
         const scope = node.getScope(scopeId);
         if (!scope) {
-            logger.warn(
-                `${node.name} tried to save data for non-locked scope ${scopeId}`,
-            );
+            node.log(`${node.name} tried to save data for non-locked scope ${scopeId}`, 'warining');
             continue;
         }
 
@@ -196,26 +145,24 @@ export async function syncData(node: MinecraftNode, packet: SyncData) {
         }
     }
 
-    logger.info(`Realm ${session.realm} saved data for ${player.name}`);
+    node.log(`Realm ${session.realm} saved data for ${player.name}`);
     return okResponse(`Saved ${player.name}`);
 }
 
-export async function requestLeaderboard(
-    node: MinecraftNode,
-    packet: RequestLeaderboard,
-) {
+export async function requestLeaderboard(node: MinecraftNode, packet: RequestLeaderboard) {
     const storage = getStorage();
 
-    return [
-        'leaderboardState',
-        {
-            entries: await storage.getLeaderboard(
-                storage.getScope(packet.scope),
-                packet.field,
-                packet.limit,
-            ),
-        },
-    ];
+    node.log(`Generating leaderboard for ${packet.scope} with the limit of ${packet.limit}`);
+
+    const start = performance.now();
+
+    const entries = await storage.getLeaderboard(storage.getScope(packet.scope), packet.field, packet.limit);
+
+    const end = performance.now();
+
+    node.log(`Leaderboard generation for ${packet.scope} took ${end - start} ms.`);
+
+    return ['leaderboardState', { entries }];
 }
 
 export async function endSession(node: MinecraftNode, packet: EndSession) {
@@ -224,9 +171,7 @@ export async function endSession(node: MinecraftNode, packet: EndSession) {
     const session = sessionMap[sessionId];
 
     if (!session) {
-        logger.warn(
-            `${node.toString()} tried to end a dead session ${sessionId}`,
-        );
+        node.log(`Tried to end a dead session ${sessionId}`, 'warn');
         return okResponse('Already dead');
     }
 
@@ -235,15 +180,29 @@ export async function endSession(node: MinecraftNode, packet: EndSession) {
     delete sessionMap[sessionId];
 
     if (player.currentSession == session) {
-        logger.debug(
-            `${session.realm} closed the active session ${session.sessionId} of ${player.name}`,
-        );
+        node.log(`${session.realm} closed the active session ${session.sessionId} of ${player.name}`);
         delete playerMap[player.uuid];
     } else {
-        logger.debug(
-            `${session.realm} closed an inactive session ${session.sessionId} of ${player.name}`,
-        );
+        node.log(`${session.realm} closed an inactive session ${session.sessionId} of ${player.name}`);
     }
 
     return okResponse('Ok');
+}
+
+export async function requestSnapshot(node: MinecraftNode, packet: RequestSnapshot) {
+    const scopes: Scope[] = [];
+
+    node.log(`Requested data snapshot for ${packet.id} in \
+            ${packet.scopes.join(', ')}`);
+
+    for (const scope of packet.scopes) {
+        if (!node.account.allowedScopes.includes(scope)) {
+            return errorResponse('SEVERE', `You don't have permission to request ${scope} scope`);
+        }
+        scopes.push(node.getScope(scope));
+    }
+
+    const player = playerMap[packet.id] || new Player(packet.id, packet.id);
+
+    return ['snapshotData', { stats: player.getStats(scopes) }];
 }

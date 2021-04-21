@@ -1,19 +1,8 @@
 import * as WebSocket from 'ws';
 import { IncomingMessage } from 'http';
 
-import {
-    errorResponse,
-    logger,
-    playerMap,
-    sessionMap,
-    setStorage,
-} from '@/helpers';
-import {
-    MinecraftNode,
-    runningRequests,
-    Session,
-    StatStorage,
-} from '@/classes';
+import { errorResponse, logger, playerMap, sessionMap, setStorage } from '@/helpers';
+import { MinecraftNode, runningRequests, Session, StatStorage } from '@/classes';
 import { MinecraftWebSocket, Sendable, Frame } from '@/types';
 import * as messageHandlers from '@/handlers/message';
 
@@ -34,26 +23,22 @@ export function websocket($storage: StatStorage) {
     wss.on('connection', (ws: MinecraftWebSocket, req: IncomingMessage) => {
         const address = req.connection.remoteAddress;
         const node = new MinecraftNode(ws as MinecraftWebSocket, address);
-        logger.info(`${address} connected.`);
+        node.log('Node connected');
 
         ws.on('close', async (code: number, reason: string) => {
+            node.log('Node disconnected: ' + code + ' ' + reason);
             logger.info(`${address} disconnected: ${code} ${reason}`);
             const activeSessions: Session[] = [];
             for (const sessionId in sessionMap) {
                 const session = sessionMap[sessionId];
-                if (
-                    session.player.currentSession == session &&
-                    session.ownerNode == node
-                ) {
+                if (session.player.currentSession == session && session.ownerNode == node) {
                     activeSessions.push(session);
                 }
             }
             for (const session of activeSessions) {
                 delete sessionMap[session.sessionId];
                 delete playerMap[session.player.uuid];
-                logger.warn(
-                    `Abrupt restart caused session ${session.sessionId} of ${session.player.name} to end.`,
-                );
+                logger.warn(`Abrupt restart caused session ${session.sessionId} of ${session.player.name} to end.`);
             }
             const index = nodes.indexOf(node);
             if (index >= 0) nodes.splice(index, 1);
@@ -87,8 +72,7 @@ export function websocket($storage: StatStorage) {
                 // @ts-ignore TODO: fix it как нибудь
                 const handle = messageHandlers[frame.type];
 
-                if (frame.type != 'auth' && !node.account)
-                    response = errorResponse('FATAL', 'Unauthorized');
+                if (frame.type != 'auth' && !node.account) response = errorResponse('FATAL', 'Unauthorized');
                 else if (handle) response = await handle(node, frame.data);
             } catch (error) {
                 response = errorResponse('SEVERE', 'Internal error');
@@ -101,11 +85,7 @@ export function websocket($storage: StatStorage) {
             }
 
             if (response) {
-                logger.debug(
-                    'Sending %s to node %s',
-                    JSON.stringify(response),
-                    node.toString(),
-                );
+                logger.debug('Sending %s to node %s', JSON.stringify(response), node.toString());
                 node.sendFrame({
                     type: response[0],
                     data: response[1],

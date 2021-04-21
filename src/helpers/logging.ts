@@ -7,9 +7,7 @@ const logFormat = [
     winston.format.errors({ stack: true }),
     winston.format.splat(),
     winston.format.simple(),
-    winston.format.printf(
-        info => `[${info.timestamp}] ${info.level}: ${info.message}`,
-    ),
+    winston.format.printf(info => `[${info.timestamp}] ${info.level}: ${info.message}`),
 ];
 
 export const logger = winston.createLogger({
@@ -22,10 +20,7 @@ export const logger = winston.createLogger({
         }),
         new winston.transports.File({ filename: 'logs/combined.log' }),
         new winston.transports.Console({
-            format: winston.format.combine(
-                winston.format.colorize(),
-                ...logFormat,
-            ),
+            format: winston.format.combine(winston.format.colorize(), ...logFormat),
         }),
     ],
 });

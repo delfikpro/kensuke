@@ -1,7 +1,7 @@
 import * as WebSocket from 'ws';
 import { MinecraftNode } from '@/classes/minecraft-node';
 
-export type Stats = Record<string, any>;
+export type KensukeData = Record<string, any>;
 
 export type PlayerLockState = {
     id: string;

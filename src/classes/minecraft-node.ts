@@ -1,30 +1,33 @@
 import { v4 as randomUUID } from 'uuid';
 
-import {
-    Account,
-    MinecraftWebSocket,
-    Scope,
-    Sendable,
-    Frame,
-    Packet,
-} from '@/types';
+import { Account, MinecraftWebSocket, Scope, Sendable, Frame, Packet } from '@/types';
+import { logger } from '@/helpers';
 
 export const timeout = +process.env.STATSERVICE_TIMEOUT || 5000;
 
 export const runningRequests: Record<string, (frame: Frame) => void> = {};
+
+export let nodeCounter = 0;
 
 export class MinecraftNode {
     isAlive = true;
     name: string;
     account: Account;
     scopes: Scope[] = [];
+    nodeIndex = ++nodeCounter;
+    nodeName = 'unknown';
 
     constructor(readonly socket: MinecraftWebSocket, readonly address: string) {
         socket.minecraftNode = this;
     }
 
     toString(): string {
-        return this.name;
+        return `node-${this.nodeIndex}/${this.account?.id || this.address}/\
+                ${this.nodeName}`;
+    }
+
+    log(message: string, level = 'info'): void {
+        logger.log(level, this.toString() + ' > ' + message);
     }
 
     sendRequest(sendable: Sendable<Packet>): Promise<Frame> {

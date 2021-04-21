@@ -1,7 +1,7 @@
 import { Collection, Db, MongoClient, IndexOptions } from 'mongodb';
 
 import { logger, hashPassword } from '@/helpers';
-import { Stats, Account, Scope } from '@/types';
+import { KensukeData, Account, Scope } from '@/types';
 import { ScopeWrapper } from '@/classes';
 
 export class StatStorage {
@@ -18,17 +18,12 @@ export class StatStorage {
         const env = process.env as Record<string, any>;
 
         for (const variable of requiredVariables) {
-            if (!process.env[variable])
-                throw Error(`No ${variable} environment variable specified.`);
+            if (!process.env[variable]) throw Error(`No ${variable} environment variable specified.`);
         }
 
         const storage = new StatStorage();
 
-        await storage.connect(
-            env.MONGO_URL,
-            env.MONGO_USER,
-            env.MONGO_PASSWORD,
-        );
+        await storage.connect(env.MONGO_URL, env.MONGO_USER, env.MONGO_PASSWORD);
 
         return storage;
     }
@@ -48,22 +43,14 @@ export class StatStorage {
         await this.reloadAccounts();
     }
 
-    async ensureCollectionExists(
-        name: string,
-        indexOptions?: IndexOptions,
-    ): Promise<Collection> {
-        const existing = await this.db
-            .listCollections({ name: 'scopes' })
-            .next();
+    async ensureCollectionExists(name: string, indexOptions?: IndexOptions): Promise<Collection> {
+        const existing = await this.db.listCollections({ name: 'scopes' }).next();
         if (existing) {
             return this.db.collection(name);
         }
 
         const collection = await this.db.createCollection(name);
-        await collection.createIndex(
-            { id: 1 },
-            indexOptions || { unique: true },
-        );
+        await collection.createIndex({ id: 1 }, indexOptions || { unique: true });
         return collection;
     }
 
@@ -117,16 +104,12 @@ export class StatStorage {
     async registerScope(id: string, owner: Account): Promise<Scope> {
         logger.info(`Registering scope ${id} for ${owner.id}...`);
 
-        if (!id.match(/^(players|arbitrary):[A-Za-z_-]+$/))
-            throw Error('Malformed scope name');
+        if (!id.match(/^(players|arbitrary):[A-Za-z_-]+$/)) throw Error('Malformed scope name');
 
-        if (this.getScope(id))
-            throw Error(`Scope ${id} already exists`);
+        if (this.getScope(id)) throw Error(`Scope ${id} already exists`);
 
         owner.allowedScopes.push(id);
-        await this.db
-            .collection('accounts')
-            .replaceOne({ id: owner.id }, owner);
+        await this.db.collection('accounts').replaceOne({ id: owner.id }, owner);
 
         const collection = await this.ensureCollectionExists(id);
 
@@ -157,17 +140,13 @@ export class StatStorage {
         }
     }
 
-    async readData(scope: Scope, id: string): Promise<Stats> {
+    async readData(scope: Scope, id: string): Promise<KensukeData> {
         const scopeWrapper = this.getScopeWrapper(scope.id);
         if (!scopeWrapper) throw Error(`Unknown scope ${scope.id}`);
         return await scopeWrapper.collection.findOne({ id });
     }
 
-    async saveData(
-        scope: Scope,
-        id: string,
-        data: Record<any, any>,
-    ): Promise<void> {
+    async saveData(scope: Scope, id: string, data: Record<any, any>): Promise<void> {
         const scopeWrapper = this.getScopeWrapper(scope.id);
         if (!scopeWrapper) throw Error(`Unknown scope ${scope.id}`);
         await scopeWrapper.collection.replaceOne(
@@ -179,16 +158,10 @@ export class StatStorage {
         );
     }
 
-    async getLeaderboard(
-        scope: Scope,
-        field: string,
-        limit: number,
-    ): Promise<any[]> {
+    async getLeaderboard(scope: Scope, field: string, limit: number): Promise<any[]> {
         const scopeWrapper = this.getScopeWrapper(scope.id);
         if (!scopeWrapper) throw Error(`Unknown scope ${scope.id}`);
 
-        return await scopeWrapper.collection
-            .aggregate([{ $sort: { [field]: -1 } }, { $limit: limit }])
-            .toArray();
+        return await scopeWrapper.collection.aggregate([{ $sort: { [field]: -1 } }, { $limit: limit }]).toArray();
     }
 }
