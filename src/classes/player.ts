@@ -6,6 +6,7 @@ import { getStorage } from '@/helpers';
 
 export class Player {
     currentSession: Session;
+    saveOwner: string;
     stats: KensukeData = {};
 
     constructor(public readonly uuid: string, public name: string) {}

@@ -22,7 +22,7 @@ export class MinecraftNode {
     }
 
     toString(): string {
-        return `node-${this.nodeIndex}/${this.account?.id || this.address}/${this.nodeName.trim()}`;
+        return `${this.nodeName}/${this.account?.id || this.address}/node-${this.nodeIndex}`;
     }
 
     log(message: string, level = 'info'): void {

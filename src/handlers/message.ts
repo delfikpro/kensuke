@@ -114,6 +114,12 @@ export async function syncData(node: MinecraftNode, packet: SyncData) {
     const player = session.player;
     const realm = session.realm;
 
+    if (player.saveOwner && session.realm != player.saveOwner) {
+        return errorResponse('WARNING', `Late save, player ${player.uuid} is already on ${realm}`);
+    }
+
+    player.saveOwner = session.realm;
+
     if (session.ownerNode != node) {
         node.log(`${node.account.id} tried to save data for ${player.name}, but the player is on ${realm}`);
         return errorResponse('WARNING', `Player ${player.toString()} is connected to ${realm}`);
