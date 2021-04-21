@@ -154,11 +154,11 @@ export async function requestLeaderboard(node: MinecraftNode, packet: RequestLea
 
     node.log(`Generating leaderboard for ${packet.scope} with the limit of ${packet.limit}`);
 
-    const start = performance.now();
+    const start = Date.now();
 
     const entries = await storage.getLeaderboard(storage.getScope(packet.scope), packet.field, packet.limit);
 
-    const end = performance.now();
+    const end = Date.now();
 
     node.log(`Leaderboard generation for ${packet.scope} took ${end - start} ms.`);
 
