@@ -138,7 +138,7 @@ export async function syncData(node: MinecraftNode, packet: SyncData) {
     for (const scopeId in packet.stats) {
         const scope = node.getScope(scopeId);
         if (!scope) {
-            node.log(`${node.name} tried to save data for non-locked scope ${scopeId}`, 'warining');
+            node.log(`${node.nodeName} tried to save data for non-locked scope ${scopeId}`, 'warning');
             continue;
         }
 

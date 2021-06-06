@@ -6,7 +6,7 @@ import { MinecraftNode, Session, StatStorage } from '@/classes';
 import { MinecraftWebSocket, Sendable, V0Frame, V1Frame, IncomingFrame } from '@/types';
 import * as messageHandlers from '@/handlers/message';
 
-const nodes: MinecraftNode[] = [];
+export const nodes: MinecraftNode[] = [];
 
 export function websocket($storage: StatStorage) {
     setStorage($storage);

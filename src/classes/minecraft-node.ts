@@ -19,7 +19,6 @@ export class MinecraftNode {
         this.talker = this.version == 0 ? new TalkerV0(this) : new TalkerV1(this);
     }
     isAlive = true;
-    name: string;
     account: Account;
     scopes: Scope[] = [];
     nodeIndex = ++nodeCounter;

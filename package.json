@@ -15,9 +15,11 @@
     "build": "tsc --project tsconfig.json --incremental && tscpaths -p tsconfig.json -s ./src -o ./dist/server"
   },
   "dependencies": {
+    "@types/express": "^4.17.12",
     "@types/leveldown": "^4.0.2",
     "@types/levelup": "^4.3.1",
     "dotenv": "^8.2.0",
+    "express": "^4.17.1",
     "leveldown": "^6.0.0",
     "levelup": "^5.0.0",
     "logform": "^2.2.0",
