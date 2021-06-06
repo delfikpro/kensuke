@@ -24,6 +24,8 @@ export function auth(node: MinecraftNode, packet: Auth) {
 
     node.log('Node authorized as ' + account.id);
 
+    node.version = packet.version || 0;
+
     return okResponse(`Successfully authorized as ${account.id}`);
 }
 
@@ -68,7 +70,7 @@ export async function createSession(node: MinecraftNode, packet: CreateSession) 
         } else {
             node.log(`Player ${player.name} connected to ${packet.realm}, asking ${oldSession.realm} to synchronize stats...`);
 
-            const response = await oldSession.ownerNode.sendRequest(['requestSync', { session: oldSession.sessionId }]);
+            const response = await oldSession.ownerNode.sendAndAwait(['requestSync', { session: oldSession.sessionId }]);
 
             // ToDo: Timeout errors probably shouldn't prevent logins
             if (response.type == 'error' && (response.data as Error).errorLevel != 'WARNING') {

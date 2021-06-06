@@ -1,15 +1,23 @@
 import { v4 as randomUUID } from 'uuid';
 
-import { Account, MinecraftWebSocket, Scope, Sendable, Frame, Packet } from '@/types';
+import { Account, MinecraftWebSocket, Scope, Sendable, Packet, V0Frame, V1Frame, IncomingFrame } from '@/types';
 import { logger } from '@/helpers';
+import { Talk, Talker, TalkerV0, TalkerV1, TalkV0 } from '@/network/talks';
 
 export const timeout = +process.env.STATSERVICE_TIMEOUT || 5000;
 
-export const runningRequests: Record<string, (frame: Frame) => void> = {};
 
 export let nodeCounter = 0;
 
 export class MinecraftNode {
+
+    talker: Talker;
+
+    _version: number;
+    set version(value: number) {
+        this._version = value
+        this.talker = this.version == 0 ? new TalkerV0(this) : new TalkerV1(this);
+    }
     isAlive = true;
     name: string;
     account: Account;
@@ -21,6 +29,15 @@ export class MinecraftNode {
         socket.minecraftNode = this;
     }
 
+
+    send(sendable: Sendable<any>) {
+        this.talker?.createTalk()?.send(sendable);
+    }
+
+    async sendAndAwait<T extends Packet>(sendable: Sendable<any>): Promise<T> {
+        return this.talker.createTalk().sendAndAwait(sendable);
+    }
+
     toString(): string {
         return `${this.nodeName}/${this.account?.id || this.address}/node-${this.nodeIndex}`;
     }
@@ -29,43 +46,15 @@ export class MinecraftNode {
         logger.log(level, this.toString() + ' > ' + message);
     }
 
-    sendRequest(sendable: Sendable<Packet>): Promise<Frame> {
-        const frame: Frame = {
-            type: sendable[0],
-            data: sendable[1],
-            uuid: randomUUID(),
-        };
-
-        return new Promise<Frame>(resolve => {
-            const wait = setTimeout(() => {
-                delete runningRequests[frame.uuid];
-                resolve({
-                    type: 'error',
-                    data: { errorLevel: 'TIMEOUT', errorMessage: 'Timeout' },
-                });
-            }, timeout);
-
-            runningRequests[frame.uuid] = frame => {
-                clearTimeout(wait);
-                delete runningRequests[frame.uuid];
-                resolve(frame);
-            };
-
-            this.sendFrame(frame);
-        });
-    }
-
-    sendPacket(sendable: Sendable<Packet>): void {
-        const frame: Frame = {
-            type: sendable[0],
-            data: sendable[1],
-        };
-
-        this.sendFrame(frame);
-    }
-
-    sendFrame(frame: Frame): void {
+    sendFrame(frame: V0Frame | V1Frame): void {
         this.socket.send(JSON.stringify(frame));
+    }
+
+    resolveFrame(frame: IncomingFrame): void {
+
+        const data = frame.packet || frame.data;
+        const talkId = frame.uuid || frame.talk;
+
     }
 
     getScope(scopeId: string): Scope {

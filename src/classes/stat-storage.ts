@@ -44,7 +44,7 @@ export class StatStorage {
     }
 
     async ensureCollectionExists(name: string, indexOptions?: IndexOptions): Promise<Collection> {
-        const existing = await this.db.listCollections({ name: 'scopes' }).next();
+        const existing = await this.db.listCollections({ name }).next();
         if (existing) {
             return this.db.collection(name);
         }

@@ -2,8 +2,8 @@ import * as WebSocket from 'ws';
 import { IncomingMessage } from 'http';
 
 import { errorResponse, logger, playerMap, sessionMap, setStorage } from '@/helpers';
-import { MinecraftNode, runningRequests, Session, StatStorage } from '@/classes';
-import { MinecraftWebSocket, Sendable, Frame } from '@/types';
+import { MinecraftNode, Session, StatStorage } from '@/classes';
+import { MinecraftWebSocket, Sendable, V0Frame, V1Frame, IncomingFrame } from '@/types';
 import * as messageHandlers from '@/handlers/message';
 
 const nodes: MinecraftNode[] = [];
@@ -13,7 +13,7 @@ export function websocket($storage: StatStorage) {
 
     setInterval(() => {
         for (const node of nodes) {
-            node.sendPacket(['keepAlive', {}]);
+            node.send(['keepAlive', {}]);
         }
     }, 5000);
 
@@ -48,7 +48,7 @@ export function websocket($storage: StatStorage) {
 
         ws.on('message', async (message: string) => {
             let response: Sendable<Record<any, any>>;
-            let frame: Frame;
+            let frame: IncomingFrame;
             // logger.debug(message);
 
             try {
@@ -73,16 +73,13 @@ export function websocket($storage: StatStorage) {
                 const handle = messageHandlers[frame.type];
 
                 if (frame.type != 'auth' && !node.account) response = errorResponse('FATAL', 'Unauthorized');
-                else if (handle) response = await handle(node, frame.data);
+                else if (handle) response = await handle(node, frame.data || frame.packet);
             } catch (error) {
                 response = errorResponse('SEVERE', 'Internal error');
                 logger.error('Internal error', error);
             }
 
-            if (frame.uuid) {
-                const runningRequest = runningRequests[frame.uuid];
-                if (runningRequest) runningRequest(frame);
-            }
+            node.talker?.acceptRequest(frame);
 
             if (response) {
                 if (response[0] == 'error') {

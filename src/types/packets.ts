@@ -2,11 +2,19 @@ import { KensukeData } from '@/types/index';
 
 export type UUID = string;
 
-export type Frame = {
+export type V0Frame = {
     type: string;
     data: Packet;
-    uuid?: UUID;
+    uuid?: any;
 };
+
+export type V1Frame = {
+    type: string;
+    packet: Packet;
+    talk: number;
+};
+
+export type IncomingFrame = V0Frame & V1Frame;
 
 export type Packet = Record<any, any>;
 
@@ -38,6 +46,7 @@ export type Auth = {
     login: string;
     password: string;
     nodeName: string;
+    version: number;
 };
 
 export type UseScopes = {

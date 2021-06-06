@@ -1,0 +1,4 @@
+export MONGO_URL="mongodb://root:optimisticNihilism@mustard.implario.dev/admin"
+export MONGO_USER="root"
+export MONGO_PASSWORD="optimisticNihilism"
+./start.sh
