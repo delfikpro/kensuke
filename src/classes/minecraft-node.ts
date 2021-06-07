@@ -16,7 +16,7 @@ export class MinecraftNode {
     _version: number;
     set version(value: number) {
         this._version = value
-        this.talker = this.version == 0 ? new TalkerV0(this) : new TalkerV1(this);
+        this.talker = this.version >= 1 ? new TalkerV1(this) : new TalkerV0(this);
     }
     isAlive = true;
     account: Account;
