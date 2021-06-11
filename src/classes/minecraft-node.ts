@@ -31,6 +31,9 @@ export class MinecraftNode {
         socket.minecraftNode = this;
     }
 
+    hasAccessTo(scope: string) {
+        return this.account.allowedScopes.includes(scope.replace("players:", ""));
+    }
 
     send(sendable: Sendable<any>) {
         this.talker?.createTalk()?.send(sendable);

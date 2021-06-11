@@ -40,7 +40,7 @@ export async function useScopes(node: MinecraftNode, packet: UseScopes) {
 
         if (node.scopes.includes(scope)) continue;
 
-        if (!node.account.allowedScopes.includes(scopeId)) {
+        if (!node.hasAccessTo(scopeId)) {
             return errorResponse('FATAL', `Not enough permissions to use ${scopeId} scope`);
         }
 
@@ -98,7 +98,7 @@ export async function createSession(node: MinecraftNode, packet: CreateSession) 
                 scope = await getStorage().registerScope(scopeId, node.account);
             }
 
-            if (!node.account.allowedScopes.includes(scopeId)) {
+            if (!node.hasAccessTo(scopeId)) {
                 return errorResponse('FATAL', `Not enough permissions to use ${scopeId} scope`);
             }
 
@@ -152,7 +152,7 @@ export async function syncData(node: MinecraftNode, packet: SyncData) {
 
     // First we check access to all scopes
     for (const scope in packet.stats) {
-        if (!node.account.allowedScopes.includes(scope)) {
+        if (!node.hasAccessTo(scope)) {
             return errorResponse('FATAL', `Account ${node.account.id} doesn't have enough permissions to alter '${scope}' scope`);
         }
         const actualScope = getStorage().getScope(scope);
@@ -215,7 +215,7 @@ export async function requestLeaderboard(node: MinecraftNode, packet: RequestLea
                 let scope = storage.getScope(scopeId);
                 if (!scope)
                     return errorResponse('FATAL', `Scope ${scopeId} doesn't exist`)
-                if (!node.account.allowedScopes.includes(scopeId))
+                if (!node.hasAccessTo(scopeId))
                     return errorResponse('FATAL', `Account ${node.account.id} doesn't have access to the scope ${scopeId}`)
 
                 let batch = await storage.readDataBatch(scope, ids);
@@ -266,7 +266,7 @@ export async function requestSnapshot(node: MinecraftNode, packet: RequestSnapsh
     node.log(`Requested data snapshot for ${packet.id} in ${packet.scopes.join(', ')}`);
 
     for (const scope of packet.scopes) {
-        if (!node.account.allowedScopes.includes(scope)) {
+        if (!node.hasAccessTo(scope)) {
             return errorResponse('FATAL', `You don't have permission to request ${scope} scope`);
         }
         scopes.push(getStorage().getScope(scope));
