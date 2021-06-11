@@ -1,6 +1,6 @@
 import { MinecraftNode, Player, Session } from '@/classes';
 import { Auth, CreateSession, UseScopes, Error, SyncData, RequestLeaderboard, EndSession, RequestSnapshot, LeaderboardEntry } from '@/types/packets';
-import { Scope } from '@/types/types';
+import { KensukeData, Scope } from '@/types/types';
 import { asError, errorResponse, getStorage, hashPassword, logger, okResponse, playerMap, sessionMap } from '@/helpers';
 
 /*
@@ -119,6 +119,14 @@ export async function createSession(node: MinecraftNode, packet: CreateSession) 
         session: packet.session,
         stats: await player.getStats(scopes),
     };
+
+    if (node.version < 1) {
+        const statsOld: KensukeData = {};
+        for (let scope in dataPacket.stats) {
+            statsOld["players:" + scope.replace("players:", "")] = dataPacket.stats[scope];
+        }
+        dataPacket.stats = statsOld;
+    }
 
     node.log(`Sending data of ${player.id} to ${newSession.realm}`);
 
