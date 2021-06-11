@@ -92,18 +92,19 @@ export async function createSession(node: MinecraftNode, packet: CreateSession) 
     if (packet.scopes) {
         for (let scopeId of packet.scopes) {
 
-        let scope = getStorage().getScope(scopeId);
+            let scope = getStorage().getScope(scopeId);
 
-        if (!scope) {
-            scope = await getStorage().registerScope(scopeId, node.account);
-        }
+            if (!scope) {
+                scope = await getStorage().registerScope(scopeId, node.account);
+            }
 
-        if (!node.account.allowedScopes.includes(scopeId)) {
-            return errorResponse('FATAL', `Not enough permissions to use ${scopeId} scope`);
-        }
+            if (!node.account.allowedScopes.includes(scopeId)) {
+                return errorResponse('FATAL', `Not enough permissions to use ${scopeId} scope`);
+            }
 
-        if (!scopes.includes(scope)) {
-            scopes.push(scope);
+            if (!scopes.includes(scope)) {
+                scopes.push(scope);
+            }
         }
     
     }
