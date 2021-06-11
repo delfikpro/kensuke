@@ -1,4 +1,3 @@
-export * from './scope-wrapper';
 export * from './session';
 export * from './stat-storage';
 export * from './minecraft-node';

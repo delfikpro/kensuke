@@ -18,6 +18,9 @@ export class MinecraftNode {
         this._version = value
         this.talker = this.version >= 1 ? new TalkerV1(this) : new TalkerV0(this);
     }
+    get version() {
+        return this._version;
+    }
     isAlive = true;
     account: Account;
     scopes: Scope[] = [];
@@ -46,6 +49,7 @@ export class MinecraftNode {
     }
 
     sendFrame(frame: V0Frame | V1Frame): void {
+        logger.debug(JSON.stringify(frame));
         this.socket.send(JSON.stringify(frame));
     }
 
@@ -56,9 +60,4 @@ export class MinecraftNode {
 
     }
 
-    getScope(scopeId: string): Scope {
-        for (const scope of this.scopes) {
-            if (scope.id == scopeId) return scope;
-        }
-    }
 }

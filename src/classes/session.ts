@@ -1,5 +1,5 @@
 import { MinecraftNode, Player } from '@/classes';
-import { PlayerLockState } from '@/types';
+import { Scope } from '@/types';
 
 export class Session {
     public active = true;
@@ -9,13 +9,14 @@ export class Session {
         public readonly sessionId: string,
         public readonly ownerNode: MinecraftNode,
         public readonly realm: string,
+        public readonly lockedScopes: Scope[]
     ) {}
 
-    public toLockState(): PlayerLockState {
-        return {
-            id: this.player.uuid,
-            session: this.sessionId,
-            realm: this.realm,
-        };
-    }
+    // public toLockState(): PlayerLockState {
+    //     return {
+    //         id: this.player.uuid,
+    //         session: this.sessionId,
+    //         realm: this.realm,
+    //     };
+    // }
 }

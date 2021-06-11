@@ -57,10 +57,20 @@ export type RequestLeaderboard = {
     scope: string;
     field: string;
     limit: number;
+    extraIds: string[];
+    extraScopes: string[];
 };
 
 export type LeaderboardState = {
     entries: any[];
+};
+
+export type LeaderboardEntry = {
+
+    id: string;
+    position: number;
+    data: Record<string, any>;
+
 };
 
 /**
@@ -70,8 +80,8 @@ export type LeaderboardState = {
 export type CreateSession = {
     playerId: UUID;
     session: UUID;
-    username: string;
     realm: string;
+    scopes: string[];
 };
 
 /**

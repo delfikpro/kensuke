@@ -3,11 +3,11 @@ import { MinecraftNode } from '@/classes/minecraft-node';
 
 export type KensukeData = Record<string, any>;
 
-export type PlayerLockState = {
-    id: string;
-    session: string;
-    realm: string;
-};
+// export type PlayerLockState = {
+//     id: string;
+//     session: string;
+//     realm: string;
+// };
 
 export type Account = {
     id: string;

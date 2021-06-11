@@ -9,22 +9,19 @@ export class Player {
     saveOwner: string;
     stats: KensukeData = {};
 
-    constructor(public readonly uuid: string, public name: string) {}
+    constructor(public readonly id: string) {}
 
     async getStats(scopes: Scope[]): Promise<KensukeData> {
         const stats: KensukeData = {};
         for (const scope of scopes) {
             let s = this.stats[scope.id];
             if (!s) {
-                s = await getStorage().readData(scope, this.uuid);
+                s = await getStorage().readData(scope, this.id);
                 this.stats[scope.id] = s;
             }
             stats[scope.id] = s;
         }
         return stats;
     }
-
-    toString(): string {
-        return `${this.name} (${this.uuid})`;
-    }
+    
 }

@@ -2,7 +2,10 @@ import { Collection, Db, MongoClient, IndexOptions } from 'mongodb';
 
 import { logger, hashPassword } from '@/helpers';
 import { KensukeData, Account, Scope } from '@/types';
-import { ScopeWrapper } from '@/classes';
+
+export class ScopeWrapper {
+    constructor(public scope: Scope, public collection: Collection<any>) {}
+}
 
 export class StatStorage {
     scopes: ScopeWrapper[];
@@ -76,6 +79,11 @@ export class StatStorage {
         this.accountsCollection = await this.ensureCollectionExists('accounts');
         this.accounts = await this.accountsCollection.find().toArray();
 
+        for (let account of this.accounts) {
+            if (!account.allowedScopes) account.allowedScopes = [];
+            else account.allowedScopes = account.allowedScopes.map(scope => scope.replace("players:", ""))
+        }
+
         logger.info(`Loaded ${this.accounts.length} accounts.`);
     }
 
@@ -102,9 +110,11 @@ export class StatStorage {
     }
 
     async registerScope(id: string, owner: Account): Promise<Scope> {
+        id = id.replace("players:", "");
+
         logger.info(`Registering scope ${id} for ${owner.id}...`);
 
-        if (!id.match(/^(players|arbitrary):[A-Za-z_-]+$/)) throw Error('Malformed scope name');
+        if (!id.match(/^[A-Za-z_-]+$/)) throw Error('Malformed scope name');
 
         if (this.getScope(id)) throw Error(`Scope ${id} already exists`);
 
@@ -136,7 +146,7 @@ export class StatStorage {
 
     getScopeWrapper(id: string): ScopeWrapper {
         for (const scope of this.scopes) {
-            if (scope.scope.id == id) return scope;
+            if (scope.scope.id == id.replace("players:", "")) return scope;
         }
     }
 
@@ -163,5 +173,16 @@ export class StatStorage {
         if (!scopeWrapper) throw Error(`Unknown scope ${scope.id}`);
 
         return await scopeWrapper.collection.aggregate([{ $sort: { [field]: -1 } }, { $limit: limit }]).toArray();
+    }
+
+    async readDataBatch(scope: Scope, ids: string[]): Promise<Record<string, KensukeData>> {
+        const scopeWrapper = this.getScopeWrapper(scope.id);
+        if (!scopeWrapper) throw Error(`Unknown scope ${scope.id}`);
+        const data = await scopeWrapper.collection.find({ id: { $in: ids } }).toArray();
+        const result: Record<string, KensukeData> = {}
+        for (let datum of data) {
+            result[datum.id] = datum;
+        }
+        return result;
     }
 }

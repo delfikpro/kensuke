@@ -1,7 +1,7 @@
 
 import { logger, playerMap } from '@/helpers';
 import express from 'express';
-import { nodes } from '@/handlers/websocket';
+import { nodes } from '@/network/connection';
 
 export function api() {
 
@@ -23,8 +23,7 @@ export function api() {
         for (let v in playerMap) {
             let player = playerMap[v];
             resp.push({
-                uuid: player.uuid,
-                name: player.name,
+                uuid: player.id,
                 session: player.currentSession?.sessionId,
                 realm: player.currentSession?.realm,
                 active: player.currentSession?.active,

@@ -1,5 +1,6 @@
 import levelup, { LevelUp } from 'levelup';
 import leveldown, { LevelDown } from 'leveldown';
+import { Session } from '@/classes';
 
 export class SessionCoordinator {
     db: LevelUp;
@@ -10,7 +11,10 @@ export class SessionCoordinator {
 
     async saveSessions(): Promise<void> {
         const a: string = (await this.db.get('name')) as string;
-        
+    }
+
+    async createSession(session: Session) {
+        this.db.put(session.sessionId, session)
     }
 
 }

@@ -1,5 +1,5 @@
 import { StatStorage } from '@/classes';
-import { websocket } from '@/handlers/websocket';
+import { websocket } from '@/network/connection';
 import { api } from '@/api/api';
 
 export async function bootstrap() {
