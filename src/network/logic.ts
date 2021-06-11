@@ -232,7 +232,7 @@ export async function requestLeaderboard(node: MinecraftNode, packet: RequestLea
 
     node.log(`Leaderboard generation for ${packet.scope} by ${packet.field} and ${packet.extraScopes} took ${end - start} ms.`);
 
-    console.log(entries);
+    // console.log(entries);
     return ['leaderboardState', { entries }];
 }
 
