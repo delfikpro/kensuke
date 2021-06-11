@@ -89,7 +89,8 @@ export async function createSession(node: MinecraftNode, packet: CreateSession) 
     const scopes: Scope[] = [];
     scopes.push(...node.scopes);
 
-    for (let scopeId of packet.scopes) {
+    if (packet.scopes) {
+        for (let scopeId of packet.scopes) {
 
         let scope = getStorage().getScope(scopeId);
 
