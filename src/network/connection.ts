@@ -49,7 +49,7 @@ export function websocket($storage: StatStorage) {
         ws.on('message', async (message: string) => {
             let response: Sendable<Record<any, any>>;
             let frame: IncomingFrame;
-            logger.debug(message);
+            logger.debug(`from ${node.nodeName}: ${message}`);
 
             try {
                 frame = JSON.parse(message);

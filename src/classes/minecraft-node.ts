@@ -52,7 +52,7 @@ export class MinecraftNode {
     }
 
     sendFrame(frame: V0Frame | V1Frame): void {
-        logger.debug(JSON.stringify(frame));
+        logger.debug("to " + this.nodeName + ": " +JSON.stringify(frame));
         this.socket.send(JSON.stringify(frame));
     }
 
