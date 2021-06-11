@@ -71,7 +71,7 @@ export class StatStorage {
     }
 
     async loadScope(scope: Scope): Promise<ScopeWrapper> {
-        const collection = await this.ensureCollectionExists(scope.id);
+        const collection = await this.ensureCollectionExists("players:" + scope.id);
         return { collection, scope };
     }
 
@@ -121,7 +121,7 @@ export class StatStorage {
         owner.allowedScopes.push(id);
         await this.db.collection('accounts').replaceOne({ id: owner.id }, owner);
 
-        const collection = await this.ensureCollectionExists(id);
+        const collection = await this.ensureCollectionExists("players:" + id);
 
         const scope = {
             id,
