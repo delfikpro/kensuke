@@ -25,6 +25,8 @@ export function auth(node: MinecraftNode, packet: Auth) {
     node.nodeName = packet.nodeName;
     node.version = packet.version || 0;
 
+    if (node.version == 1) return errorResponse('FATAL', `Blacklisted version 1`)
+
     node.log('Node authorized as ' + account.id + ', protocol version is ' + node.version + ' ' + packet.version);
 
     if (node.version == 0) {
