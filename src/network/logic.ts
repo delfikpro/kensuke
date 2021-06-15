@@ -30,7 +30,7 @@ export function auth(node: MinecraftNode, packet: Auth) {
     node.log('Node authorized as ' + account.id + ', protocol version is ' + node.version + ' ' + packet.version);
 
     if (node.version == 0) {
-        setInterval(() => {
+        setTimeout(() => {
             sessionStorage.sessionMap.forEach(session => {
                 if (session.node == node.nodeName && session.account == node.account.id) {
                     node.send(['requestSync', { session: session.sessionId } as RequestSync])
