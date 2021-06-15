@@ -3,11 +3,17 @@ import { Collection, Db, MongoClient, IndexOptions } from 'mongodb';
 import { logger, hashPassword } from '@/helpers';
 import { KensukeData, Account, Scope } from '@/types';
 
+export var dataStorage: DataStorage;
+
+export async function initDataStorage() {
+    dataStorage = await DataStorage.init();
+}
+
 export class ScopeWrapper {
     constructor(public scope: Scope, public collection: Collection<any>) {}
 }
 
-export class StatStorage {
+export class DataStorage {
     scopes: ScopeWrapper[];
     scopesCollection: Collection;
 
@@ -16,7 +22,7 @@ export class StatStorage {
 
     db: Db;
 
-    static async init(): Promise<StatStorage> {
+    static async init(): Promise<DataStorage> {
         const requiredVariables = ['MONGO_URL', 'MONGO_USER', 'MONGO_PASSWORD'];
         const env = process.env as Record<string, any>;
 
@@ -24,7 +30,7 @@ export class StatStorage {
             if (!process.env[variable]) throw Error(`No ${variable} environment variable specified.`);
         }
 
-        const storage = new StatStorage();
+        const storage = new DataStorage();
 
         await storage.connect(env.MONGO_URL, env.MONGO_USER, env.MONGO_PASSWORD);
 
@@ -159,9 +165,14 @@ export class StatStorage {
     async saveData(scope: Scope, id: string, data: Record<any, any>): Promise<void> {
         const scopeWrapper = this.getScopeWrapper(scope.id);
         if (!scopeWrapper) throw Error(`Unknown scope ${scope.id}`);
+
+        const document = { ...data };
+        delete document.id;
+        document.id = id;
+
         await scopeWrapper.collection.replaceOne(
             { id },
-            { id, ...data },
+            document,
             {
                 upsert: true,
             },

@@ -1,7 +1,10 @@
-import { MinecraftNode, Player, Session } from '@/classes';
-import { Auth, CreateSession, UseScopes, Error, SyncData, RequestLeaderboard, EndSession, RequestSnapshot, LeaderboardEntry } from '@/types/packets';
+import { dataStorage, MinecraftNode, Dao, Session } from '@/classes';
+import { Auth, CreateSession, UseScopes, Error, SyncData, RequestLeaderboard, EndSession, RequestSnapshot, LeaderboardEntry, RequestSync } from '@/types/packets';
 import { KensukeData, Scope } from '@/types/types';
-import { asError, errorResponse, getStorage, hashPassword, logger, okResponse, playerMap, sessionMap } from '@/helpers';
+import { asError, errorResponse, hashPassword, logger, okResponse } from '@/helpers';
+import { nodes } from './connection';
+import { sessionStorage, StoredSession } from '@/session/session-storage';
+import { getDao } from '@/data/data-cache';
 
 /*
 Record<
@@ -11,11 +14,10 @@ Record<
  */
 
 export function auth(node: MinecraftNode, packet: Auth) {
-    const storage = getStorage();
 
     if (node.account) return errorResponse('WARNING', `Already authorized as ${node.account.id}.`);
 
-    const account = storage.getAccount(packet.login);
+    const account = dataStorage.getAccount(packet.login);
 
     if (!account || account.passwordHash !== hashPassword(packet.password)) return errorResponse('FATAL', `Invalid credentials`);
 
@@ -25,17 +27,40 @@ export function auth(node: MinecraftNode, packet: Auth) {
 
     node.log('Node authorized as ' + account.id + ', protocol version is ' + node.version + ' ' + packet.version);
 
+    if (node.version == 0) {
+        setInterval(() => {
+            sessionStorage.sessionMap.forEach(session => {
+                if (session.node == node.nodeName && session.account == node.account.id) {
+                    node.send(['requestSync', { session: session.sessionId } as RequestSync])
+                }
+            })
+        }, 500);
+    } else if (node.version > 0 && packet.activeSessions) {
+        for (let sessionId of packet.activeSessions) {
+            let session = sessionStorage.getSession(sessionId);
+            if (!session) {
+                node.log('Ignored unknown session on handshake: ' + sessionId);
+                continue;
+            }
+            if (session.account != node.account.id || session.node != node.nodeName) {
+                node.log(`Ignored session ${sessionId} because owner differs: ${session.node}/${session.account}`)
+                continue;
+            }
+            node.ownedSessions.push(sessionId);
+            node.log(`Now owning session ${sessionId} of ${session.dataId}`);
+        }
+    }
+
     return okResponse(`Successfully authorized as ${account.id}`);
 }
 
 export async function useScopes(node: MinecraftNode, packet: UseScopes) {
-    const storage = getStorage();
 
     for (const scopeId of packet.scopes) {
-        let scope = storage.getScope(scopeId);
+        let scope = dataStorage.getScope(scopeId);
         
         if (!scope) {
-            scope = await storage.registerScope(scopeId, node.account);
+            scope = await dataStorage.registerScope(scopeId, node.account);
         }
 
         if (node.scopes.includes(scope)) continue;
@@ -51,39 +76,70 @@ export async function useScopes(node: MinecraftNode, packet: UseScopes) {
 }
 
 export async function createSession(node: MinecraftNode, packet: CreateSession) {
-    const existingSession = sessionMap[packet.session];
-    if (existingSession) {
-        logger.warn(`${packet.realm} tried to create an existing session: ${packet.session}`);
+
+    if (sessionStorage.getSession(packet.session)) {
+        logger.warn(`${node} tried to create an existing session: ${packet.session}`);
         return errorResponse('SEVERE', 'Session already exists');
     }
 
-    const uuid = packet.playerId;
-    if (!uuid) return errorResponse('SEVERE', 'No playerId provided');
+    const dataId = packet.playerId;
+    if (!dataId) return errorResponse('SEVERE', 'No playerId provided');
 
-    let player = playerMap[uuid];
+    const sessions = sessionStorage.getSessionsByDataId(dataId);
 
-    if (player) {
-        const oldSession = player.currentSession;
+    if (sessions.length) {
+        
+        const oldSession = sessions[0];
 
-        if (!oldSession?.active) {
-            node.log(`Player ${player.id} wasn't removed upon leaving the network. This is probably a bug.`, 'warn');
-        } else {
-            node.log(`Player ${player.id} connected to ${packet.realm}, asking ${oldSession.realm} to synchronize stats...`);
+        const oldSessionNode = nodes.find(s => s.ownedSessions.includes(oldSession.sessionId));
 
-            const response = await oldSession.ownerNode.sendAndAwait(['requestSync', { session: oldSession.sessionId }]);
+        if (!oldSessionNode) {
 
-            // ToDo: Timeout errors probably shouldn't prevent logins
-            if (response.type == 'error' && (response.data as Error).errorLevel != 'WARNING') {
-                node.log(`${oldSession.realm} failed to save data for ${player.id}: ${(response.data as Error).errorMessage}`);
-                throw asError(response.data as Error);
+            let firstFailTime = oldSession.firstFailTime;
+            if (!firstFailTime) {
+                oldSession.firstFailTime = firstFailTime = Date.now();
+            }
+
+            const sessionLifetime = Date.now() - firstFailTime;
+            if (sessionLifetime > 60000) {
+                await sessionStorage.removeSession(oldSession.sessionId);
+                node.log(`Discarded old session ${oldSession.sessionId} of ${oldSession.dataId} because its previous owner ${oldSession.node}/${oldSession.account} never reconnected`, 'warn')
+            } else {
+                return errorResponse('TIMEOUT', `Node ${oldSession.node} was using the data of ${dataId} and is now unreachable. Old session will be discarded in ${60000 - sessionLifetime} ms.`);
             }
         }
-    } else {
-        player = new Player(uuid);
 
-        node.log(`Player ${player.id} joined the network on ${packet.realm}`);
+        node.log(`Created session ${packet.session} for ${dataId}, asking ${oldSessionNode} to synchronize data...`);
 
-        playerMap[uuid] = player;
+        if (oldSessionNode) {
+            
+            const response = await oldSessionNode.sendAndAwait(['requestSync', { session: oldSession.sessionId }]);
+    
+            if (response.type == 'error') {
+
+                let firstFailTime = oldSession.firstFailTime;
+                if (!firstFailTime) {
+                    oldSession.firstFailTime = firstFailTime = Date.now();
+                }
+
+                const sessionLifetime = Date.now() - firstFailTime;
+
+                const error = response.data as Error;
+                oldSessionNode.log(`Error while force syncing session ${oldSession.sessionId} of ${oldSession.dataId}: ${error.errorMessage}`);
+
+                if (sessionLifetime > 60000) {
+                    await sessionStorage.removeSession(oldSession.sessionId);
+                    node.log(`Discarding old session ${oldSession.sessionId} of ${oldSession.dataId} because its previous owner ${oldSession.node}/${oldSession.account} was unable to save the data in 60 seconds`, 'warn')
+                    node.send(['endSession', { session: oldSession.sessionId } as EndSession])
+                } else {
+                    return errorResponse('TIMEOUT', `Node ${oldSession.node} was using the data of ${dataId} and is now unreachable. Old session will be discarded in ${60000 - sessionLifetime} ms.`);
+                }
+            }
+        }
+
+        if (sessions.length > 1)
+            return errorResponse('SEVERE', `Id ${dataId} already has multiple sessions: ${sessions.map(s => s.sessionId).join(", ")}`);
+    
     }
 
     const scopes: Scope[] = [];
@@ -92,10 +148,10 @@ export async function createSession(node: MinecraftNode, packet: CreateSession) 
     if (packet.scopes) {
         for (let scopeId of packet.scopes) {
 
-            let scope = getStorage().getScope(scopeId);
+            let scope = dataStorage.getScope(scopeId);
 
             if (!scope) {
-                scope = await getStorage().registerScope(scopeId, node.account);
+                scope = await dataStorage.registerScope(scopeId, node.account);
             }
 
             if (!node.hasAccessTo(scopeId)) {
@@ -109,17 +165,12 @@ export async function createSession(node: MinecraftNode, packet: CreateSession) 
     
     }
 
-    const newSession = new Session(player, packet.session, node, packet.realm, scopes);
-
-    sessionMap[packet.session] = newSession;
-
-    player.currentSession = newSession;
-
     const dataPacket: SyncData = {
         session: packet.session,
-        stats: await player.getStats(scopes),
+        stats: await getDao(dataId).getData(scopes),
     };
 
+    // Old kensuke clients are hoping that scopes are prefixed with "players:"
     if (node.version < 1) {
         const statsOld: KensukeData = {};
         for (let scope in dataPacket.stats) {
@@ -128,79 +179,116 @@ export async function createSession(node: MinecraftNode, packet: CreateSession) 
         dataPacket.stats = statsOld;
     }
 
-    node.log(`Sending data of ${player.id} to ${newSession.realm}`);
+    // After all the data is ready, create the session.
+    const newSession: StoredSession = {
+        dataId,
+        account: node.account.id,
+        node: node.nodeName,
+        scopes: packet.scopes,
+        sessionId: packet.session,
+        time: Date.now(),
+        hadWrites: false,
+        firstFailTime: 0
+    };
+
+    // Write session to session database
+    await sessionStorage.writeSession(newSession);
+
+    // And also to owned sessions of this node
+    node.ownedSessions.push(newSession.sessionId);
+
+    node.log(`Locked ${dataId} with session ${newSession.sessionId} and scopes ${packet.scopes.join(",")}`);
 
     return ['syncData', dataPacket];
 }
 
 export async function syncData(node: MinecraftNode, packet: SyncData) {
-    const storage = getStorage();
+    const storage = dataStorage;
 
     const sessionId = packet.session;
-    const session = sessionMap[sessionId];
+
+    const session = sessionStorage.getSession(sessionId);
 
     if (!session) {
-        node.log(`Unable to find session ${sessionId}`);
+        node.log(`Unable to find session ${sessionId} for sync`, 'error');
+
+        node.send(['endSession', {session: sessionId} as EndSession]);
         return errorResponse('SEVERE', `Unable to find session ${sessionId}`);
     }
 
-    const player = session.player;
-    const realm = session.realm;
+    const sessionOwnerNode = nodes.find(node => node.ownedSessions.includes(sessionId));
 
-    if (player.saveOwner && session.realm != player.saveOwner) {
-        return errorResponse('WARNING', `Late save, player ${player.id} is already on ${realm}`);
+    // If no other node has claimed this session before, allow this node to become its owner.
+    if (!sessionOwnerNode && session.account == node.account.id) {
+        node.ownedSessions.push(sessionId);
+    } else if (sessionOwnerNode != node) {
+        node.log(`Tried to sync on ${sessionId} of ${session.dataId}, but ${session.account} at ${sessionOwnerNode} is the owner.`)
+        return errorResponse('SEVERE', `This session is owned by ${session.account} at ${sessionOwnerNode}`);
     }
 
-    player.saveOwner = session.realm;
 
-    if (session.ownerNode != node) {
-        node.log(`${node.account.id} tried to save data for ${player.id}, but the player is on ${realm}`);
-        return errorResponse('WARNING', `Player ${player.id} is connected to ${realm}`);
+    // If there is a newer session than this, that already saved some data,
+    // then old session syncs will be ignored.
+    const saveOwnerSession = sessionStorage.getLatestSessionWithWrites(session.sessionId);
+
+    if (saveOwnerSession && saveOwnerSession != session) {
+        node.log(`Received syncData for an active session ${sessionId} of ${session.dataId}, but there already is \
+                 an another active session ${saveOwnerSession.sessionId} on ${saveOwnerSession.node}`, 'warn');
+        return errorResponse('WARNING', `Ignored the save for session ${sessionId} of ${session.dataId} because there \
+                is a newer active session ${saveOwnerSession.sessionId}`)
     }
 
-    // First we check access to all scopes
+    // Now this is the newest session with writes
+    session.hadWrites = true;
+    await sessionStorage.writeSession(session);
+
+    // Forget about previous fails
+    session.firstFailTime = 0;
+
+    // First we check access to all the scopes
     for (const scope in packet.stats) {
         if (!node.hasAccessTo(scope)) {
-            return errorResponse('FATAL', `Account ${node.account.id} doesn't have enough permissions to alter '${scope}' scope`);
+            return errorResponse('FATAL', `Account ${node.account.id} doesn't have enough permissions to alter the '${scope}' scope`);
         }
-        const actualScope = getStorage().getScope(scope);
+        const actualScope = dataStorage.getScope(scope);
         if (!actualScope) {
             return errorResponse('FATAL', `Tried to synchronize unknown scope '${scope}'`);
         }
-        if (!session.lockedScopes.includes(actualScope)) {
+        if (!session.scopes.includes(actualScope.id)) {
             return errorResponse('FATAL', `Locked scopes of session ${session.sessionId} do not include the scope ${scope}`);
         }
     }
 
+    let dao = getDao(session.dataId);
+
     // Then alter
     for (const scopeId in packet.stats) {
-        const scope = getStorage().getScope(scopeId);
+        const scope = dataStorage.getScope(scopeId);
 
         const data = packet.stats[scopeId];
 
-        player.stats[scopeId] = data;
+        dao.stats[scopeId] = data;
         try {
-            await storage.saveData(scope, player.id, data);
+            await storage.saveData(scope, dao.id, data);
         } catch (error) {
-            logger.error(`Error while saving ${player.id}:`, error);
+            logger.error(`Error while saving ${dao.id}:`, error);
             return errorResponse('SEVERE', 'Database error');
         }
     }
 
-    node.log(`Realm ${session.realm} saved data for ${player.id}`);
-    return okResponse(`Saved ${player.id}`);
+    node.log(`Saved data for session ${sessionId} of ${session.dataId}`);
+    return okResponse(`Saved ${session.dataId}`);
 }
 
 
 export async function requestLeaderboard(node: MinecraftNode, packet: RequestLeaderboard) {
-    const storage = getStorage();
 
     node.log(`Generating leaderboard for ${packet.scope} by ${packet.field} with the limit of ${packet.limit}`);
 
     const start = Date.now();
 
     
-    let entries = await storage.getLeaderboard(storage.getScope(packet.scope), packet.field, packet.limit);
+    let entries = await dataStorage.getLeaderboard(dataStorage.getScope(packet.scope), packet.field, packet.limit);
     if (node.version >= 1) {
         const ids: string[] = entries.map(e => e.id);
         if (packet.extraIds) ids.push(...packet.extraIds)
@@ -220,13 +308,13 @@ export async function requestLeaderboard(node: MinecraftNode, packet: RequestLea
 
         if (packet.extraScopes) {
             for (let scopeId of packet.extraScopes) {
-                let scope = storage.getScope(scopeId);
+                let scope = dataStorage.getScope(scopeId);
                 if (!scope)
                     return errorResponse('FATAL', `Scope ${scopeId} doesn't exist`)
                 if (!node.hasAccessTo(scopeId))
                     return errorResponse('FATAL', `Account ${node.account.id} doesn't have access to the scope ${scopeId}`)
 
-                let batch = await storage.readDataBatch(scope, ids);
+                let batch = await dataStorage.readDataBatch(scope, ids);
                 
                 for (let entry of response) {
                     entry.data[scopeId] = batch[entry.id];
@@ -247,23 +335,28 @@ export async function requestLeaderboard(node: MinecraftNode, packet: RequestLea
 export async function endSession(node: MinecraftNode, packet: EndSession) {
     const sessionId = packet.session;
 
-    const session = sessionMap[sessionId];
+    const session = sessionStorage.getSession(sessionId);
 
     if (!session) {
-        node.log(`Tried to end a dead session ${sessionId}`, 'warn');
+        node.log(`Tried to end a dead session ${sessionId}`);
         return okResponse('Already dead');
     }
+    
+    const sessionOwnerNode = nodes.find(node => node.ownedSessions.includes(sessionId));
 
-    const player = session.player;
-
-    delete sessionMap[sessionId];
-
-    if (player.currentSession == session) {
-        node.log(`${session.realm} closed the active session ${session.sessionId} of ${player.id}`);
-        delete playerMap[player.id];
-    } else {
-        node.log(`${session.realm} closed an inactive session ${session.sessionId} of ${player.id}`);
+    // If no other node has claimed this session before, allow this node to become its owner.
+    if (sessionOwnerNode && sessionOwnerNode != node) {
+        node.log(`Tried to end session ${sessionId} that belongs to ${sessionOwnerNode}`, 'warning');
+        return errorResponse("SEVERE", `Session ${sessionId} is owned by a different node.`);
     }
+
+    // Remove session from the database
+    await sessionStorage.removeSession(session.sessionId);
+
+    // Also remove it from ownedSessions of this node
+    node.ownedSessions.splice(node.ownedSessions.indexOf(sessionId), 1);
+
+    node.log(`Ended session ${session.sessionId} of ${session.dataId}.`);
 
     return okResponse('Ok');
 }
@@ -277,10 +370,8 @@ export async function requestSnapshot(node: MinecraftNode, packet: RequestSnapsh
         if (!node.hasAccessTo(scope)) {
             return errorResponse('FATAL', `You don't have permission to request ${scope} scope`);
         }
-        scopes.push(getStorage().getScope(scope));
+        scopes.push(dataStorage.getScope(scope));
     }
 
-    const player = playerMap[packet.id] || new Player(packet.id);
-
-    return ['snapshotData', { stats: player.getStats(scopes) }];
+    return ['snapshotData', { stats: await getDao(packet.id).getData(scopes) }];
 }

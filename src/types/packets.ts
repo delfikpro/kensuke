@@ -40,13 +40,14 @@ export type Error = {
 export type KeepAlive = Record<any, any>;
 
 /**
- * Auth packet is the first packet sent by statservice clients
+ * Auth packet is the first packet sent by kensuke clients
  */
 export type Auth = {
     login: string;
     password: string;
     nodeName: string;
     version: number;
+    activeSessions: string[];
 };
 
 export type UseScopes = {
@@ -80,7 +81,7 @@ export type LeaderboardEntry = {
 export type CreateSession = {
     playerId: UUID;
     session: UUID;
-    realm: string;
+    // realm: string;
     scopes: string[];
 };
 

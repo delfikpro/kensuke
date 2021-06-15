@@ -1,15 +1,14 @@
 import * as WebSocket from 'ws';
 import { IncomingMessage } from 'http';
 
-import { errorResponse, logger, playerMap, sessionMap, setStorage } from '@/helpers';
-import { MinecraftNode, Session, StatStorage } from '@/classes';
+import { errorResponse, logger } from '@/helpers';
+import { MinecraftNode, Session, DataStorage } from '@/classes';
 import { MinecraftWebSocket, Sendable, V0Frame, V1Frame, IncomingFrame } from '@/types';
 import * as messageHandlers from '@/network/logic';
 
 export const nodes: MinecraftNode[] = [];
 
-export function websocket($storage: StatStorage) {
-    setStorage($storage);
+export function websocket() {
 
     setInterval(() => {
         for (const node of nodes) {
@@ -17,8 +16,9 @@ export function websocket($storage: StatStorage) {
         }
     }, 5000);
 
-    const wss = new WebSocket.Server({ port: +process.env.PORT || 8999 });
-    logger.info('Ready!');
+    const port = +process.env.PORT || 8999
+    const wss = new WebSocket.Server({ port });
+    logger.info(`WebSocket API is available at port :${port}`);
 
     wss.on('connection', (ws: MinecraftWebSocket, req: IncomingMessage) => {
         const address = req.connection.remoteAddress;
@@ -27,19 +27,7 @@ export function websocket($storage: StatStorage) {
 
         ws.on('close', async (code: number, reason: string) => {
             node.log('Node disconnected: ' + code + ' ' + reason);
-            logger.info(`${address} disconnected: ${code} ${reason}`);
-            const activeSessions: Session[] = [];
-            for (const sessionId in sessionMap) {
-                const session = sessionMap[sessionId];
-                if (session.player.currentSession == session && session.ownerNode == node) {
-                    activeSessions.push(session);
-                }
-            }
-            for (const session of activeSessions) {
-                delete sessionMap[session.sessionId];
-                delete playerMap[session.player.id];
-                logger.warn(`Abrupt restart caused session ${session.sessionId} of ${session.player.id} to end.`);
-            }
+            logger.info(`${address} disconnected: ${code} ${reason}, it had ${node.ownedSessions.length} owned sessions.`);
             const index = nodes.indexOf(node);
             if (index >= 0) nodes.splice(index, 1);
         });
@@ -91,11 +79,6 @@ export function websocket($storage: StatStorage) {
                 // logger.debug('Sending %s to node %s', JSON.stringify(response), node.toString());
 
                 node.talker.createTalk(frame).send(response);
-                // node.sendFrame({
-                //     type: response[0],
-                //     data: response[1],
-                //     uuid: frame.uuid,
-                // });
             }
         });
     });

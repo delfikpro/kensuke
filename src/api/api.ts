@@ -1,7 +1,9 @@
 
-import { logger, playerMap } from '@/helpers';
+import { logger } from '@/helpers';
 import express from 'express';
 import { nodes } from '@/network/connection';
+import { dataCache } from '@/data/data-cache';
+import { sessionStorage } from '@/session/session-storage';
 
 export function api() {
 
@@ -13,25 +15,21 @@ export function api() {
         res.send({
             kensuke: '2.0',
             uptimeMillis: Date.now() - started,
-            uptimeHours: (Date.now() - started) / 3600000
+            uptimeHours: (Date.now() - started) / 3600000,
+            dataCache: dataCache.getStats(),
+            sessions: sessionStorage.sessionMap.size
         });
     });
 
-    app.get('/players', (req, res) => {
+    app.get('/sessions', (req, res) => {
 
         const resp: any[] = [];
-        for (let v in playerMap) {
-            let player = playerMap[v];
-            resp.push({
-                uuid: player.id,
-                session: player.currentSession?.sessionId,
-                realm: player.currentSession?.realm,
-                active: player.currentSession?.active,
-                cached_scopes: Object.keys(player.stats)
-            });
+        for (let entry of sessionStorage.sessionMap) {
+            const session = entry[1];
+            resp.push(session);
         }
 
-        res.send({players: resp})
+        res.send({sessions: resp})
     });
 
     app.get('/nodes', (req, res) => {
@@ -45,7 +43,7 @@ export function api() {
                 ordinal: node.nodeIndex,
                 owner: node.account?.id,
                 used_scopes: node.scopes.map(s => s.id),
-                players_online: Object.values(playerMap).filter(p => p.currentSession?.ownerNode == node).length,
+                players_online: Object.values(dataCache).filter(p => p.currentSession?.ownerNode == node).length,
             });
         }
 
@@ -53,7 +51,7 @@ export function api() {
     });
 
     app.listen(port, () => {
-        logger.info("Web interface is available at port :" + port);
+        logger.info("REST metrics API is available at port :" + port);
     })
 
 }

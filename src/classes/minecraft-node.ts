@@ -3,6 +3,7 @@ import { v4 as randomUUID } from 'uuid';
 import { Account, MinecraftWebSocket, Scope, Sendable, Packet, V0Frame, V1Frame, IncomingFrame } from '@/types';
 import { logger } from '@/helpers';
 import { Talk, Talker, TalkerV0, TalkerV1, TalkV0 } from '@/network/talks';
+import { Session } from 'inspector';
 
 export const timeout = +process.env.STATSERVICE_TIMEOUT || 5000;
 
@@ -27,6 +28,8 @@ export class MinecraftNode {
     nodeIndex = ++nodeCounter;
     nodeName = 'unknown';
 
+    ownedSessions: string[] = [];
+
     constructor(readonly socket: MinecraftWebSocket, readonly address: string) {
         socket.minecraftNode = this;
     }
@@ -44,7 +47,7 @@ export class MinecraftNode {
     }
 
     toString(): string {
-        return `${this.nodeName}/${this.account?.id || this.address}/node-${this.nodeIndex}`;
+        return `${this.nodeName}/${this.account?.id || "unathorized"}/node-${this.nodeIndex}`;
     }
 
     log(message: string, level = 'info'): void {
