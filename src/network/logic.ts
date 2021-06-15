@@ -197,7 +197,7 @@ export async function createSession(node: MinecraftNode, packet: CreateSession) 
     // And also to owned sessions of this node
     node.ownedSessions.push(newSession.sessionId);
 
-    node.log(`Locked ${dataId} with session ${newSession.sessionId} and scopes ${packet.scopes.join(",")}`);
+    node.log(`Locked ${dataId} with session ${newSession.sessionId} and scopes ${packet.scopes?.join(",")}`);
 
     return ['syncData', dataPacket];
 }
