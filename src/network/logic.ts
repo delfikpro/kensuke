@@ -184,7 +184,7 @@ export async function createSession(node: MinecraftNode, packet: CreateSession) 
         dataId,
         account: node.account.id,
         node: node.nodeName,
-        scopes: packet.scopes,
+        scopes: packet.scopes || [],
         sessionId: packet.session,
         time: Date.now(),
         hadWrites: false,
