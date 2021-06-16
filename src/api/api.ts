@@ -43,7 +43,7 @@ export function api() {
                 ordinal: node.nodeIndex,
                 owner: node.account?.id,
                 used_scopes: node.scopes.map(s => s.id),
-                players_online: Object.values(dataCache).filter(p => p.currentSession?.ownerNode == node).length,
+                owned_sessions: node.ownedSessions,
             });
         }
 
