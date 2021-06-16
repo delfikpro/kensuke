@@ -65,6 +65,7 @@ export function websocket() {
             } catch (error) {
                 response = errorResponse('SEVERE', 'Internal error');
                 logger.error('Internal error', error);
+                logger.error(error.stack);
             }
 
             node.talker?.acceptRequest(frame);
