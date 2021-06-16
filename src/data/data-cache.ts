@@ -16,8 +16,11 @@ export const dataCache = new NodeCache({
 });
 
 export function getDao(dataId: string): Dao {
-    const existing: Dao = dataCache.get(dataId);
-    if (existing) return existing;
+    
+    if (dataCache.has(dataId)) {
+        const existing: Dao = dataCache.get(dataId);
+        if (existing) return existing;
+    }
 
     const dao = new Dao(dataId);
     dataCache.set(dataId, dao);
