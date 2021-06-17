@@ -76,10 +76,7 @@ export class TalkV0 implements Talk {
         return new Promise<T>((resolve, reject) => {
             const wait = setTimeout(() => {
                 this.talker.runningRequests.delete(this.talkId);
-                reject({
-                    type: 'error',
-                    data: { errorLevel: 'TIMEOUT', errorMessage: 'Timeout' },
-                });
+                reject(new Error("Timed out"));
             }, timeout);
 
 
@@ -113,10 +110,7 @@ export class TalkV1 implements Talk {
         return new Promise<T>((resolve, reject) => {
             const wait = setTimeout(() => {
                 this.talker.runningRequests.delete(this.talkId);
-                reject({
-                    type: 'error',
-                    data: { errorLevel: 'TIMEOUT', errorMessage: 'Timeout' },
-                });
+                reject(new Error("Timed out"));
             }, timeout);
 
 

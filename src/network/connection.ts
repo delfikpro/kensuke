@@ -79,7 +79,7 @@ export function websocket() {
 
                 // logger.debug('Sending %s to node %s', JSON.stringify(response), node.toString());
 
-                node.talker.createTalk(frame).send(response);
+                node.talker?.createTalk(frame)?.send(response);
             }
         });
     });

@@ -19,11 +19,11 @@ export function auth(node: MinecraftNode, packet: Auth) {
 
     const account = dataStorage.getAccount(packet.login);
 
+    node.version = packet.version || 0;
     if (!account || account.passwordHash !== hashPassword(packet.password)) return errorResponse('FATAL', `Invalid credentials`);
 
     node.account = account;
     node.nodeName = packet.nodeName;
-    node.version = packet.version || 0;
 
     // if (node.version == 1) return errorResponse('FATAL', `Blacklisted version 1`)
 
@@ -77,6 +77,8 @@ export async function useScopes(node: MinecraftNode, packet: UseScopes) {
     return okResponse('All ok.');
 }
 
+export const sessionFailTimeLimit = 10000;
+
 export async function createSession(node: MinecraftNode, packet: CreateSession) {
 
     if (sessionStorage.getSession(packet.session)) {
@@ -115,9 +117,15 @@ export async function createSession(node: MinecraftNode, packet: CreateSession) 
 
         if (oldSessionNode) {
             
-            const response = await oldSessionNode.sendAndAwait(['requestSync', { session: oldSession.sessionId }]);
-    
-            if (response.type == 'error') {
+            try {
+                const response = await oldSessionNode.sendAndAwait(['requestSync', { session: oldSession.sessionId }]);
+
+                if (response.errorMessage) {
+                    oldSessionNode.log(`Explicit fail while syncing session ${oldSession.sessionId} of ${oldSession.dataId}: ${response.errorLevel} '${response.errorMessage}', discarding the session`, 'warn')
+                    await endSession(oldSessionNode, { session: oldSession.sessionId });
+                }
+
+            } catch (error) {
 
                 let firstFailTime = oldSession.firstFailTime;
                 if (!firstFailTime) {
@@ -126,13 +134,12 @@ export async function createSession(node: MinecraftNode, packet: CreateSession) 
 
                 const sessionLifetime = Date.now() - firstFailTime;
 
-                const error = response.data as Error;
                 oldSessionNode.log(`Error while force syncing session ${oldSession.sessionId} of ${oldSession.dataId}: ${error.errorMessage}`);
 
-                if (sessionLifetime > 60000) {
-                    await sessionStorage.removeSession(oldSession.sessionId);
-                    node.log(`Discarding old session ${oldSession.sessionId} of ${oldSession.dataId} because its previous owner ${oldSession.node}/${oldSession.account} was unable to save the data in 60 seconds`, 'warn')
-                    node.send(['endSession', { session: oldSession.sessionId } as EndSession])
+                if (sessionLifetime > sessionFailTimeLimit) {
+                    oldSessionNode.log(`Discarding old session ${oldSession.sessionId} of ${oldSession.dataId} because its previous owner ${oldSession.node}/${oldSession.account} was unable to save the data in 60 seconds`, 'warn');
+                    endSession(oldSessionNode, { session: oldSession.sessionId });
+                    oldSessionNode.send(['endSession', { session: oldSession.sessionId } as EndSession])
                 } else {
                     return errorResponse('TIMEOUT', `Node ${oldSession.node} was using the data of ${dataId} and is now unreachable. Old session will be discarded in ${60000 - sessionLifetime} ms.`);
                 }
