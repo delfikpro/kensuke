@@ -102,7 +102,7 @@ export class DataStorage {
     async registerAccount(id: string, password: string): Promise<Account> {
         logger.info(`Registering account ${id}`);
 
-        if (this.getAccount(id)) throw Error(`Account ${id} already exists`);
+        if (this.getAccount(id)) throw new Error(`Account ${id} already exists`);
 
         const account: Account = {
             id: id,

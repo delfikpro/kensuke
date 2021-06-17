@@ -64,7 +64,7 @@ export function websocket() {
                 else if (handle) response = await handle(node, frame.data || frame.packet);
             } catch (error) {
                 response = errorResponse('SEVERE', 'Internal error');
-                logger.error('Internal error', error);
+                logger.error(`Internal error: '${error}', ${typeof error}`);
                 logger.error(error.stack);
             }
 
