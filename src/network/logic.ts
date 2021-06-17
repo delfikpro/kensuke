@@ -5,6 +5,7 @@ import { asError, errorResponse, hashPassword, logger, okResponse } from '@/help
 import { nodes } from './connection';
 import { sessionStorage, StoredSession } from '@/session/session-storage';
 import { getDao } from '@/data/data-cache';
+import { response } from 'express';
 
 /*
 Record<
@@ -77,7 +78,8 @@ export async function useScopes(node: MinecraftNode, packet: UseScopes) {
     return okResponse('All ok.');
 }
 
-export const sessionFailTimeLimit = 10000;
+export const kensukeStarted = Date.now();
+export const warmupTimeWindow = 10000;
 
 export async function createSession(node: MinecraftNode, packet: CreateSession) {
 
@@ -91,63 +93,41 @@ export async function createSession(node: MinecraftNode, packet: CreateSession) 
 
     const sessions = sessionStorage.getSessionsByDataId(dataId);
 
-    if (sessions.length) {
+    for (const oldSession of sessions) {
         
-        const oldSession = sessions[0];
-
         const oldSessionNode = nodes.find(s => s.ownedSessions.includes(oldSession.sessionId));
 
         if (!oldSessionNode) {
-
-            let firstFailTime = oldSession.firstFailTime;
-            if (!firstFailTime) {
-                oldSession.firstFailTime = firstFailTime = Date.now();
+            if (Date.now() - kensukeStarted < warmupTimeWindow) {
+                return errorResponse('TIMEOUT', 'Kensuke is still warming up');
             }
-
-            const sessionLifetime = Date.now() - firstFailTime;
-            if (sessionLifetime > 60000) {
-                await sessionStorage.removeSession(oldSession.sessionId);
-                node.log(`Discarded old session ${oldSession.sessionId} of ${oldSession.dataId} because its previous owner ${oldSession.node}/${oldSession.account} never reconnected`, 'warn')
-            } else {
-                return errorResponse('TIMEOUT', `Node ${oldSession.node} was using the data of ${dataId} and is now unreachable. Old session will be discarded in ${60000 - sessionLifetime} ms.`);
-            }
+            await sessionStorage.removeSession(oldSession.sessionId);
+            node.log(`Discarded old session ${oldSession.sessionId} of ${oldSession.dataId} because its previous owner ${oldSession.node}/${oldSession.account} never reconnected`, 'warn')
+            continue;
         }
 
-        node.log(`Created session ${packet.session} for ${dataId}, asking ${oldSessionNode} to synchronize data...`);
+        node.log(`Creating of session ${packet.session} for ${dataId}, asking ${oldSessionNode} to synchronize data...`);
 
-        if (oldSessionNode) {
+        
+        try {
+            const response = await oldSessionNode.sendAndAwait(['requestSync', { session: oldSession.sessionId }]);
+
+            if (response.errorMessage) {
+                oldSessionNode.log(`Explicit fail while syncing session ${oldSession.sessionId} of ${oldSession.dataId}: ${response.errorLevel} '${response.errorMessage}', discarding the session`, 'warn')
+                await endSession(oldSessionNode, { session: oldSession.sessionId });
+            }
+
+        } catch (error) {
+
+            oldSessionNode.log(`Error while force syncing session ${oldSession.sessionId} of ${oldSession.dataId}: ${error.errorMessage}`);
+            await endSession(oldSessionNode, { session: oldSession.sessionId });
             
-            try {
-                const response = await oldSessionNode.sendAndAwait(['requestSync', { session: oldSession.sessionId }]);
-
-                if (response.errorMessage) {
-                    oldSessionNode.log(`Explicit fail while syncing session ${oldSession.sessionId} of ${oldSession.dataId}: ${response.errorLevel} '${response.errorMessage}', discarding the session`, 'warn')
-                    await endSession(oldSessionNode, { session: oldSession.sessionId });
-                }
-
-            } catch (error) {
-
-                let firstFailTime = oldSession.firstFailTime;
-                if (!firstFailTime) {
-                    oldSession.firstFailTime = firstFailTime = Date.now();
-                }
-
-                const sessionLifetime = Date.now() - firstFailTime;
-
-                oldSessionNode.log(`Error while force syncing session ${oldSession.sessionId} of ${oldSession.dataId}: ${error.errorMessage}`);
-
-                if (sessionLifetime > sessionFailTimeLimit) {
-                    oldSessionNode.log(`Discarding old session ${oldSession.sessionId} of ${oldSession.dataId} because its previous owner ${oldSession.node}/${oldSession.account} was unable to save the data in 60 seconds`, 'warn');
-                    endSession(oldSessionNode, { session: oldSession.sessionId });
-                    oldSessionNode.send(['endSession', { session: oldSession.sessionId } as EndSession])
-                } else {
-                    return errorResponse('TIMEOUT', `Node ${oldSession.node} was using the data of ${dataId} and is now unreachable. Old session will be discarded in ${60000 - sessionLifetime} ms.`);
-                }
-            }
+            // return errorResponse('TIMEOUT', `Node ${oldSession.node} was using the data of ${dataId} and is now unreachable. Old session will be discarded in ${60000 - sessionLifetime} ms.`);
+            
         }
 
-        if (sessions.length > 1)
-            return errorResponse('SEVERE', `Id ${dataId} already has multiple sessions: ${sessions.map(s => s.sessionId).join(", ")}`);
+        // if (sessions.length > 1)
+            // return errorResponse('SEVERE', `Id ${dataId} already has multiple sessions: ${sessions.map(s => s.sessionId).join(", ")}`);
     
     }
 
@@ -197,7 +177,6 @@ export async function createSession(node: MinecraftNode, packet: CreateSession) 
         sessionId: packet.session,
         time: Date.now(),
         hadWrites: false,
-        firstFailTime: 0
     };
 
     // Write session to session database
@@ -240,7 +219,7 @@ export async function syncData(node: MinecraftNode, packet: SyncData) {
     // then old session syncs will be ignored.
     const saveOwnerSession = sessionStorage.getLatestSessionWithWrites(session.sessionId);
 
-    if (saveOwnerSession && saveOwnerSession != session) {
+    if (saveOwnerSession && saveOwnerSession != session && session.time < saveOwnerSession.time) {
         node.log(`Received syncData for an active session ${sessionId} of ${session.dataId}, but there already is \
                  an another active session ${saveOwnerSession.sessionId} on ${saveOwnerSession.node}`, 'warn');
         return errorResponse('WARNING', `Ignored the save for session ${sessionId} of ${session.dataId} because there \
@@ -250,9 +229,6 @@ export async function syncData(node: MinecraftNode, packet: SyncData) {
     // Now this is the newest session with writes
     session.hadWrites = true;
     await sessionStorage.writeSession(session);
-
-    // Forget about previous fails
-    session.firstFailTime = 0;
 
     // First we check access to all the scopes
     for (const scope in packet.stats) {

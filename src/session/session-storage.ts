@@ -12,7 +12,6 @@ export type StoredSession = {
     readonly time: number,
     readonly scopes: string[],
     hadWrites: boolean,
-    firstFailTime: number,
 };
 
 export var sessionStorage: SessionStorage
