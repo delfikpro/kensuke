@@ -19,6 +19,7 @@ export type Scope = {
     id: string;
     createdBy: string;
     createdAt: number;
+    indexes: string[];
 };
 
 export type Sendable<T extends Record<any, any>> = [packetClass: string, data: T];

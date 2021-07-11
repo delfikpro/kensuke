@@ -285,7 +285,7 @@ export async function syncData(node: MinecraftNode, packet: SyncData) {
 export async function requestLeaderboard(node: MinecraftNode, packet: RequestLeaderboard) {
 
     node.log(`Generating leaderboard for ${packet.scope} by ${packet.field} with the limit of ${packet.limit}`);
-
+    
     const start = Date.now();
 
     

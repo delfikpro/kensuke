@@ -70,6 +70,7 @@ export class DataStorage {
         const scopes: Scope[] = await this.scopesCollection.find().toArray();
 
         for (const scope of scopes) {
+            if (!scope.indexes) scope.indexes = ['id'];
             this.scopes.push(await this.loadScope(scope));
         }
 
@@ -129,10 +130,11 @@ export class DataStorage {
 
         const collection = await this.ensureCollectionExists("players:" + id);
 
-        const scope = {
+        const scope: Scope = {
             id,
             createdBy: owner.id,
             createdAt: Date.now(),
+            indexes: ['id']
         };
 
         const scopeWrapper = new ScopeWrapper(scope, collection);
@@ -183,7 +185,17 @@ export class DataStorage {
         const scopeWrapper = this.getScopeWrapper(scope.id);
         if (!scopeWrapper) throw Error(`Unknown scope ${scope.id}`);
 
-        return await scopeWrapper.collection.aggregate([{ $sort: { [field]: -1 } }, { $limit: limit }]).toArray();
+        let result = await scopeWrapper.collection.aggregate([{ $sort: { [field]: -1 } }, { $limit: limit }]).toArray();
+
+        if (result && result.length) {
+            if (!scope.indexes.includes(field)) {
+                await scopeWrapper.collection.createIndex({[field]: 1});
+                scope.indexes.push(field);
+                this.scopesCollection.replaceOne({id: scope.id}, scope);
+            }
+        }
+
+        return result;
     }
 
     async readDataBatch(scope: Scope, ids: string[]): Promise<Record<string, KensukeData>> {
