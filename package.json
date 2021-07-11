@@ -19,6 +19,7 @@
     "@types/leveldown": "^4.0.2",
     "@types/levelup": "^4.3.1",
     "@types/node-cache": "^4.2.5",
+    "clickhouse": "^2.4.0",
     "dotenv": "^8.2.0",
     "express": "^4.17.1",
     "leveldown": "^6.0.0",

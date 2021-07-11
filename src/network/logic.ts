@@ -3,9 +3,10 @@ import { Auth, CreateSession, UseScopes, Error, SyncData, RequestLeaderboard, En
 import { KensukeData, Scope } from '@/types/types';
 import { asError, errorResponse, hashPassword, logger, okResponse } from '@/helpers';
 import { nodes } from './connection';
-import { sessionStorage, StoredSession } from '@/session/session-storage';
+import { SessionStorage, sessionStorage, StoredSession } from '@/session/session-storage';
 import { getDao } from '@/data/data-cache';
 import { response } from 'express';
+import { logHistory } from '@/history/historydb';
 
 /*
 Record<
@@ -42,14 +43,17 @@ export function auth(node: MinecraftNode, packet: Auth) {
         for (let sessionId of packet.activeSessions) {
             let session = sessionStorage.getSession(sessionId);
             if (!session) {
+                node.history(sessionId, null, 1, "unknown_session", null)
                 node.log('Ignored unknown session on handshake: ' + sessionId);
                 continue;
             }
             if (session.account != node.account.id || session.node != node.nodeName) {
+                node.history(sessionId, session.dataId, 2, "other_node_session", null)
                 node.log(`Ignored session ${sessionId} because owner differs: ${session.node}/${session.account}`)
                 continue;
             }
             node.ownedSessions.push(sessionId);
+            node.history(sessionId, session.dataId, 0, "reassign_session", null)
             node.log(`Now owning session ${sessionId} of ${session.dataId}`);
         }
     }
@@ -83,8 +87,10 @@ export const warmupTimeWindow = 10000;
 
 export async function createSession(node: MinecraftNode, packet: CreateSession) {
 
-    if (sessionStorage.getSession(packet.session)) {
-        logger.warn(`${node} tried to create an existing session: ${packet.session}`);
+    let existingSession = sessionStorage.getSession(packet.session);
+    if (existingSession) {
+        node.history(packet.session, existingSession.dataId, 2, 'session_already_exists', null);
+        node.log(`Tried to create an existing session: ${packet.session}`);
         return errorResponse('SEVERE', 'Session already exists');
     }
 
@@ -102,10 +108,12 @@ export async function createSession(node: MinecraftNode, packet: CreateSession) 
                 return errorResponse('TIMEOUT', 'Kensuke is still warming up');
             }
             await sessionStorage.removeSession(oldSession.sessionId);
+            node.history(oldSession.sessionId, oldSession.dataId, 1, 'discard_dead_session', null)
             node.log(`Discarded old session ${oldSession.sessionId} of ${oldSession.dataId} because its previous owner ${oldSession.node}/${oldSession.account} never reconnected`, 'warn')
             continue;
         }
 
+        node.history(packet.session, dataId, 0, 'creating_session', null);
         node.log(`Creating of session ${packet.session} for ${dataId}, asking ${oldSessionNode} to synchronize data...`);
 
         
@@ -113,12 +121,14 @@ export async function createSession(node: MinecraftNode, packet: CreateSession) 
             const response = await oldSessionNode.sendAndAwait(['requestSync', { session: oldSession.sessionId }]);
 
             if (response.errorMessage) {
+                oldSessionNode.history(oldSession.sessionId, oldSession.dataId, 2, 'failed_sync', response.errorMessage);
                 oldSessionNode.log(`Explicit fail while syncing session ${oldSession.sessionId} of ${oldSession.dataId}: ${response.errorLevel} '${response.errorMessage}', discarding the session`, 'warn')
                 await endSession(oldSessionNode, { session: oldSession.sessionId });
             }
 
         } catch (error) {
 
+            oldSessionNode.history(oldSession.sessionId, oldSession.dataId, 2, 'failed_sync', error.errorMessage);
             oldSessionNode.log(`Error while force syncing session ${oldSession.sessionId} of ${oldSession.dataId}: ${error.errorMessage}`);
             await endSession(oldSessionNode, { session: oldSession.sessionId });
             
@@ -185,7 +195,8 @@ export async function createSession(node: MinecraftNode, packet: CreateSession) 
     // And also to owned sessions of this node
     node.ownedSessions.push(newSession.sessionId);
 
-    node.log(`Locked ${dataId} with session ${newSession.sessionId} and scopes ${packet.scopes?.join(",")}`);
+    node.history(newSession.sessionId, dataId, 0, 'created_session', JSON.stringify(dataPacket.stats))
+    node.log(`Successfully created session ${newSession.sessionId} for ${dataId} with scopes ${packet.scopes?.join(",")}`);
 
     return ['syncData', dataPacket];
 }
@@ -198,6 +209,7 @@ export async function syncData(node: MinecraftNode, packet: SyncData) {
     const session = sessionStorage.getSession(sessionId);
 
     if (!session) {
+        node.history(sessionId, null, 2, 'unknown_session', JSON.stringify(packet.stats));
         node.log(`Unable to find session ${sessionId} for sync`, 'error');
 
         node.send(['endSession', {session: sessionId} as EndSession]);
@@ -210,6 +222,7 @@ export async function syncData(node: MinecraftNode, packet: SyncData) {
     if (!sessionOwnerNode && session.account == node.account.id) {
         node.ownedSessions.push(sessionId);
     } else if (sessionOwnerNode != node) {
+        node.history(sessionId, session.dataId, 2, 'other_node_session', JSON.stringify(packet.stats));
         node.log(`Tried to sync on ${sessionId} of ${session.dataId}, but ${session.account} at ${sessionOwnerNode} is the owner.`)
         return errorResponse('SEVERE', `This session is owned by ${session.account} at ${sessionOwnerNode}`);
     }
@@ -220,6 +233,7 @@ export async function syncData(node: MinecraftNode, packet: SyncData) {
     const saveOwnerSession = sessionStorage.getLatestSessionWithWrites(session.sessionId);
 
     if (saveOwnerSession && saveOwnerSession != session && session.time < saveOwnerSession.time) {
+        node.history(sessionId, session.dataId, 1, 'sync_outdated_session', JSON.stringify(packet.stats));
         node.log(`Received syncData for an active session ${sessionId} of ${session.dataId}, but there already is \
                  an another active session ${saveOwnerSession.sessionId} on ${saveOwnerSession.node}`, 'warn');
         return errorResponse('WARNING', `Ignored the save for session ${sessionId} of ${session.dataId} because there \
@@ -256,11 +270,13 @@ export async function syncData(node: MinecraftNode, packet: SyncData) {
         try {
             await storage.saveData(scope, dao.id, data);
         } catch (error) {
+            node.history(sessionId, dao.id, 2, 'storage_fail', JSON.stringify(packet.stats));
             logger.error(`Error while saving ${dao.id}:`, error);
             return errorResponse('SEVERE', 'Database error');
         }
     }
 
+    node.history(sessionId, session.dataId, 0, 'saved_data', JSON.stringify(packet.stats));
     node.log(`Saved data for session ${sessionId} of ${session.dataId}`);
     return okResponse(`Saved ${session.dataId}`);
 }
@@ -323,6 +339,7 @@ export async function endSession(node: MinecraftNode, packet: EndSession) {
     const session = sessionStorage.getSession(sessionId);
 
     if (!session) {
+        node.history(sessionId, null, 1, 'unknown_session', null);
         node.log(`Tried to end a dead session ${sessionId}`);
         return okResponse('Already dead');
     }
@@ -331,6 +348,7 @@ export async function endSession(node: MinecraftNode, packet: EndSession) {
 
     // If no other node has claimed this session before, allow this node to become its owner.
     if (sessionOwnerNode && sessionOwnerNode != node) {
+        node.history(sessionId, session.dataId, 2, 'other_node_session', null);
         node.log(`Tried to end session ${sessionId} that belongs to ${sessionOwnerNode}`, 'warning');
         return errorResponse("SEVERE", `Session ${sessionId} is owned by a different node.`);
     }
@@ -341,6 +359,7 @@ export async function endSession(node: MinecraftNode, packet: EndSession) {
     // Also remove it from ownedSessions of this node
     node.ownedSessions.splice(node.ownedSessions.indexOf(sessionId), 1);
 
+    node.history(sessionId, session.dataId, 0, 'end_session', null);
     node.log(`Ended session ${session.sessionId} of ${session.dataId}.`);
 
     return okResponse('Ok');

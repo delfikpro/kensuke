@@ -1,12 +1,12 @@
 import { v4 as randomUUID } from 'uuid';
 
-import { Account, MinecraftWebSocket, Scope, Sendable, Packet, V0Frame, V1Frame, IncomingFrame } from '@/types';
+import { Account, MinecraftWebSocket, Scope, Sendable, Packet, V0Frame, V1Frame, IncomingFrame, UUID } from '@/types';
 import { logger } from '@/helpers';
 import { Talk, Talker, TalkerV0, TalkerV1, TalkV0 } from '@/network/talks';
 import { Session } from 'inspector';
+import { logHistory } from '@/history/historydb';
 
 export const timeout = +process.env.STATSERVICE_TIMEOUT || 5000;
-
 
 export let nodeCounter = 0;
 
@@ -52,6 +52,10 @@ export class MinecraftNode {
 
     log(message: string, level = 'info'): void {
         logger.log(level, this.toString() + ' > ' + message);
+    }
+
+    history(session: UUID, dataId: string, severity: 0|1|2|3, event: string, data: string): void {
+        logHistory(session, dataId, severity, event, this.toString(), data);
     }
 
     sendFrame(frame: V0Frame | V1Frame): void {
