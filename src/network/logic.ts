@@ -98,6 +98,7 @@ export async function createSession(node: MinecraftNode, packet: CreateSession) 
     if (!dataId) return errorResponse('SEVERE', 'No playerId provided');
 
     const sessions = sessionStorage.getSessionsByDataId(dataId);
+    node.history(packet.session, dataId, 0, 'creating_session', null);
 
     for (const oldSession of sessions) {
         
@@ -113,9 +114,9 @@ export async function createSession(node: MinecraftNode, packet: CreateSession) 
             continue;
         }
 
-        node.history(packet.session, dataId, 0, 'creating_session', null);
         node.log(`Creating of session ${packet.session} for ${dataId}, asking ${oldSessionNode} to synchronize data...`);
 
+        node.history(oldSession.sessionId, dataId, 0, 'requesting_sync', null);
         
         try {
             const response = await oldSessionNode.sendAndAwait(['requestSync', { session: oldSession.sessionId }]);
@@ -124,6 +125,8 @@ export async function createSession(node: MinecraftNode, packet: CreateSession) 
                 oldSessionNode.history(oldSession.sessionId, oldSession.dataId, 2, 'failed_sync', response.errorMessage);
                 oldSessionNode.log(`Explicit fail while syncing session ${oldSession.sessionId} of ${oldSession.dataId}: ${response.errorLevel} '${response.errorMessage}', discarding the session`, 'warn')
                 await endSession(oldSessionNode, { session: oldSession.sessionId });
+            } else {
+                oldSessionNode.history(oldSession.sessionId, oldSession.dataId, 0, 'successful_sync', JSON.stringify(response));
             }
 
         } catch (error) {
