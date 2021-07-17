@@ -1,5 +1,5 @@
 import { dataStorage, MinecraftNode, Dao, Session } from '@/classes';
-import { Auth, CreateSession, UseScopes, Error, SyncData, RequestLeaderboard, EndSession, RequestSnapshot, LeaderboardEntry, RequestSync } from '@/types/packets';
+import { Auth, CreateSession, UseScopes, Error, SyncData, RequestLeaderboard, EndSession, RequestSnapshot, LeaderboardEntry, RequestSync, DataSnapshot } from '@/types/packets';
 import { KensukeData, Scope } from '@/types/types';
 import { asError, errorResponse, hashPassword, logger, okResponse } from '@/helpers';
 import { nodes } from './connection';
@@ -381,4 +381,38 @@ export async function requestSnapshot(node: MinecraftNode, packet: RequestSnapsh
     }
 
     return ['snapshotData', { stats: await getDao(packet.id).getData(scopes) }];
+}
+
+export async function dataSnapshot(node: MinecraftNode, packet: DataSnapshot) {
+    const scopes: Scope[] = [];
+
+    const scopeNames = Object.keys(packet.stats);
+
+    node.log(`Writing data snapshot for ${packet.id} in ${scopeNames.join(', ')}`);
+
+    for (const scope of scopeNames) {
+        if (!node.hasAccessTo(scope)) {
+            return errorResponse('FATAL', `You don't have permission to request ${scope} scope`);
+        }
+        scopes.push(dataStorage.getScope(scope));
+    }
+
+    let dao = getDao(packet.id);
+
+    // Then alter
+    for (const scopeId in packet.stats) {
+        const scope = dataStorage.getScope(scopeId);
+
+        const data = packet.stats[scopeId];
+
+        dao.stats[scopeId] = data;
+        try {
+            await dataStorage.saveData(scope, dao.id, data);
+        } catch (error) {
+            logger.error(`Error while writing ${dao.id}:`, error);
+            return errorResponse('SEVERE', 'Database error');
+        }
+    }
+
+    return okResponse('ok.');
 }

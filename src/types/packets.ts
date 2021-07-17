@@ -122,6 +122,5 @@ export type RequestSnapshot = {
 
 export type DataSnapshot = {
     id: UUID;
-    name: string;
     stats: KensukeData;
 };
