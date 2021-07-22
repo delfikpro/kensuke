@@ -38,7 +38,7 @@ export function init() {
 	
 }
 
-export async function logHistory(sessionId: UUID, dataId: string, severity: 0|1|2|3, event: string, node: string, data: string) {
+export function logHistory(sessionId: UUID, dataId: string, severity: 0|1|2|3, event: string, node: string, data: string) {
 
 	pendingRows.push([new Date().toISOString(), sessionId, dataId, severity, event, node, data]);
 
