@@ -144,6 +144,9 @@ export async function createSession(node: MinecraftNode, packet: CreateSession) 
     
     }
 
+
+    node.history(packet.session, dataId, 0, 'synced_all', null);
+
     const scopes: Scope[] = [];
     scopes.push(...node.scopes);
 
@@ -171,6 +174,8 @@ export async function createSession(node: MinecraftNode, packet: CreateSession) 
         session: packet.session,
         stats: await getDao(dataId).getData(scopes),
     };
+
+    node.history(packet.session, dataId, 0, 'loaded_data', JSON.stringify(dataPacket.stats))
 
     // Old kensuke clients are hoping that scopes are prefixed with "players:"
     if (node.version < 1) {
