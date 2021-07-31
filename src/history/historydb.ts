@@ -28,9 +28,9 @@ export function init() {
 	setTimeout(async () => {
 		const bulk = pendingRows;
 		pendingRows = [];
-		if (pendingRows.length) {
+		if (bulk.length) {
 			const ws = clickhouse.insert('INSERT INTO kensuke.sessionlog').stream();
-			for (let row of pendingRows) {
+			for (let row of bulk) {
 				await ws.writeRow(row);
 			}
 			await ws.exec();
