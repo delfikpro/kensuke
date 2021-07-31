@@ -25,15 +25,18 @@ export var pendingRows: any[][] = [];
 
 export function init() {
 
-	setInterval(async () => {
+	setTimeout(async () => {
+		const bulk = pendingRows;
+		pendingRows = [];
 		if (pendingRows.length) {
 			const ws = clickhouse.insert('INSERT INTO kensuke.sessionlog').stream();
 			for (let row of pendingRows) {
 				await ws.writeRow(row);
 			}
 			await ws.exec();
-			pendingRows = [];
+
 		}
+		init();
 	}, 1000)
 	
 }
