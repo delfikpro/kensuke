@@ -37,7 +37,7 @@ export function websocket() {
         ws.on('message', async (message: string) => {
             let response: Sendable<Record<any, any>>;
             let frame: IncomingFrame;
-            logger.debug(`from ${node.nodeName}: ${message}`);
+            logger.info(`from ${node.nodeName}: ${message}`);
 
             try {
                 frame = JSON.parse(message);
