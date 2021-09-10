@@ -16,7 +16,7 @@ export function api() {
             kensuke: '2.0',
             uptimeMillis: Date.now() - started,
             uptimeHours: (Date.now() - started) / 3600000,
-            dataCache: dataCache.getStats(),
+            cachedEntries: dataCache.size,
             sessions: sessionStorage.sessionMap.size
         });
     });
