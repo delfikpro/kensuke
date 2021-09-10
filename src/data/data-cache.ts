@@ -25,13 +25,11 @@ export var dataCache = new Map<string, CacheEntry>();
 export function updateCache() {
     const time = Date.now();
     if (time - lastCacheUpdate > 10000) {
-        let newMap = new Map<string, CacheEntry>();
         dataCache.forEach((v, k) => {
-            if (v.lastTouch + 60000 >= time || sessionStorage.getSessionsByDataId(k).length > 0) {
-                newMap.set(k, v);
+            if (v.lastTouch + 60000 < time && sessionStorage.getSessionsByDataId(k).length == 0) {
+                dataCache.delete(k);
             }
         });
-        dataCache = newMap;
         lastCacheUpdate = Date.now();
     }
 }
