@@ -2,7 +2,6 @@
 import { logger } from '@/helpers';
 import express from 'express';
 import { nodes } from '@/network/connection';
-import { dataCache } from '@/data/data-cache';
 import { sessionStorage } from '@/session/session-storage';
 
 export function api() {
@@ -16,7 +15,6 @@ export function api() {
             kensuke: '2.0',
             uptimeMillis: Date.now() - started,
             uptimeHours: (Date.now() - started) / 3600000,
-            cachedEntries: dataCache.size,
             sessions: sessionStorage.sessionMap.size
         });
     });
