@@ -26,6 +26,45 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@node-redis/client@npm:^1.0.1":
+  version: 1.0.1
+  resolution: "@node-redis/client@npm:1.0.1"
+  dependencies:
+    cluster-key-slot: 1.1.0
+    generic-pool: 3.8.2
+    redis-parser: 3.0.0
+    yallist: 4.0.0
+  checksum: 9d36c1d567b9a0bbaf88531d8a9338089c8707dad06fb5a9f0eadadae29c1007f2305b6007cdf9c6a0e5d7fb390e690d5cf25c3ba3ade8853c0f087091966be8
+  languageName: node
+  linkType: hard
+
+"@node-redis/json@npm:^1.0.1":
+  version: 1.0.1
+  resolution: "@node-redis/json@npm:1.0.1"
+  peerDependencies:
+    "@node-redis/client": ^1.0.0
+  checksum: e9e69d3aa067fb05792fff09479bca23ee310caa16b54292aeca7f2348e5410bcd60abfe297328e7626bf64081174c68089cf3ff3917fd883bb031a583d1ebb0
+  languageName: node
+  linkType: hard
+
+"@node-redis/search@npm:^1.0.1":
+  version: 1.0.1
+  resolution: "@node-redis/search@npm:1.0.1"
+  peerDependencies:
+    "@node-redis/client": ^1.0.0
+  checksum: fb0903dc2e990571cb77e306c5e31ee7613ebaa14097cdf3f6baf2c0de3a63cf761b15637361b5fdfdc43f1687d46d8086d870c4e7c1fc9a159639f174023c77
+  languageName: node
+  linkType: hard
+
+"@node-redis/time-series@npm:^1.0.0":
+  version: 1.0.0
+  resolution: "@node-redis/time-series@npm:1.0.0"
+  peerDependencies:
+    "@node-redis/client": ^1.0.0
+  checksum: 4eb3878b54b96ff1682cc38597d73f583391a0603f374338e1eac89c4526f66cee95e0b533087c1df1ed2c2def4c00cd7767c6e193aebcc137cbb8403ef090f8
+  languageName: node
+  linkType: hard
+
 "@nodelib/fs.scandir@npm:2.1.4":
   version: 2.1.4
   resolution: "@nodelib/fs.scandir@npm:2.1.4"
@@ -824,6 +863,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"cluster-key-slot@npm:1.1.0":
+  version: 1.1.0
+  resolution: "cluster-key-slot@npm:1.1.0"
+  checksum: 3b41b06942f6b0df71029dec9df6a272be2ab78353d60fcdc5a4af3b88a749d7fb2d1d3b092db0108b2bdd104086c03edcaa3b25ef432590bb954981d6cd7715
+  languageName: node
+  linkType: hard
+
 "code-point-at@npm:^1.0.0":
   version: 1.1.0
   resolution: "code-point-at@npm:1.1.0"
@@ -1575,6 +1621,13 @@ __metadata:
     strip-ansi: ^3.0.1
     wide-align: ^1.1.0
   checksum: b136dbeb8e40acaaddab6c71c9f34d3c9aa104efc538c8c0ddcd74b25efb8daeb8dca24a9b30626b477d66beccd3dee8dd31e25eb4c7c97ec58a3f1a82914be1
+  languageName: node
+  linkType: hard
+
+"generic-pool@npm:3.8.2":
+  version: 3.8.2
+  resolution: "generic-pool@npm:3.8.2"
+  checksum: ed54cc0a033a4cee180c938cd1c076a7c853f8c3603341f61ef93fce21002c0e6a5146561b2abaf86980684ca50330f9e2f8b1a2ac8eb4b80e49666374a6f906
   languageName: node
   linkType: hard
 
@@ -3025,6 +3078,34 @@ __metadata:
   languageName: node
   linkType: hard
 
+"redis-errors@npm:^1.0.0":
+  version: 1.2.0
+  resolution: "redis-errors@npm:1.2.0"
+  checksum: b260bb64a1c8523d32a56701681ac3e5cc6bb0a4eb09f1d30729ebba397021d274216ff189909c08fe3c6b706ec8b74948e20ea410b6f69d31b35bda3fb82a59
+  languageName: node
+  linkType: hard
+
+"redis-parser@npm:3.0.0":
+  version: 3.0.0
+  resolution: "redis-parser@npm:3.0.0"
+  dependencies:
+    redis-errors: ^1.0.0
+  checksum: 45dbcb05bed2c80a4aac288bbefed2347ecf3508c24d542ab42efa21fd63b5aaca4208b206f05818835a2ac43abe09250c2638c11c3b0b66a5d67e83985e350f
+  languageName: node
+  linkType: hard
+
+"redis@npm:^4.0.1":
+  version: 4.0.1
+  resolution: "redis@npm:4.0.1"
+  dependencies:
+    "@node-redis/client": ^1.0.1
+    "@node-redis/json": ^1.0.1
+    "@node-redis/search": ^1.0.1
+    "@node-redis/time-series": ^1.0.0
+  checksum: 70298d9af002a64407dc76353f0d0005b1e9f943431fc5e61915cd896930a2d002984637a8e74081ef45581a10cf50aa2fca38fbf295f3b31ce4d4ef7f34deb8
+  languageName: node
+  linkType: hard
+
 "regex-not@npm:^1.0.0, regex-not@npm:^1.0.2":
   version: 1.0.2
   resolution: "regex-not@npm:1.0.2"
@@ -3488,6 +3569,7 @@ __metadata:
     module-alias: ^2.2.2
     mongodb: ^3.6.4
     node-cache: ^5.1.2
+    redis: ^4.0.1
     tscpaths: ^0.0.9
     typescript: ^4.1.3
     uuid: ^8.3.2
@@ -3931,7 +4013,7 @@ typescript@^4.1.3:
   languageName: node
   linkType: hard
 
-"yallist@npm:^4.0.0":
+"yallist@npm:4.0.0, yallist@npm:^4.0.0":
   version: 4.0.0
   resolution: "yallist@npm:4.0.0"
   checksum: a2960ef879af6ee67a76cae29bac9d8bffeb6e9e366c217dbd21464e7fce071933705544724f47e90ba5209cf9c83c17d5582dd04415d86747a826b2a231efb8

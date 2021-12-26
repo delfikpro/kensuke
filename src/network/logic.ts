@@ -4,7 +4,7 @@ import { KensukeData, Scope } from '@/types/types';
 import { asError, errorResponse, hashPassword, logger, okResponse } from '@/helpers';
 import { nodes } from './connection';
 import { SessionStorage, sessionStorage, StoredSession } from '@/session/session-storage';
-import { getDao } from '@/data/data-cache';
+import { cache, getDao } from '@/cache/cache';
 import { response } from 'express';
 import { logHistory } from '@/history/historydb';
 
@@ -172,7 +172,7 @@ export async function createSession(node: MinecraftNode, packet: CreateSession) 
 
     const dataPacket: SyncData = {
         session: packet.session,
-        stats: await getDao(dataId).getData(scopes),
+        stats: await (await getDao(dataId)).getData(scopes),
     };
 
     node.history(packet.session, dataId, 0, 'loaded_data', JSON.stringify(dataPacket.stats))
@@ -266,7 +266,7 @@ export async function syncData(node: MinecraftNode, packet: SyncData) {
         }
     }
 
-    let dao = getDao(session.dataId);
+    let dao = await getDao(session.dataId);
 
     // Then alter
     for (const scopeId in packet.stats) {
@@ -282,6 +282,14 @@ export async function syncData(node: MinecraftNode, packet: SyncData) {
             logger.error(`Error while saving ${dao.id}:`, error);
             return errorResponse('SEVERE', 'Database error');
         }
+    }
+    try {
+        await cache(dao.id, dao.stats);
+    } catch (error) {
+        node.history(sessionId, dao.id, 2, 'cache_fail', JSON.stringify(packet.stats));
+        logger.error(`Error while caching ${dao.id}:`, error);
+        // Cache consistency is actually important
+        return errorResponse('SEVERE', 'Cache write error');
     }
 
     node.history(sessionId, session.dataId, 0, 'saved_data', JSON.stringify(packet.stats));
@@ -385,7 +393,7 @@ export async function requestSnapshot(node: MinecraftNode, packet: RequestSnapsh
         scopes.push(dataStorage.getScope(scope));
     }
 
-    return ['snapshotData', { stats: await getDao(packet.id).getData(scopes) }];
+    return ['snapshotData', { stats: await (await getDao(packet.id)).getData(scopes) }];
 }
 
 export async function dataSnapshot(node: MinecraftNode, packet: DataSnapshot) {
@@ -402,7 +410,7 @@ export async function dataSnapshot(node: MinecraftNode, packet: DataSnapshot) {
         scopes.push(dataStorage.getScope(scope));
     }
 
-    let dao = getDao(packet.id);
+    let dao = await getDao(packet.id);
 
     // Then alter
     for (const scopeId in packet.stats) {
@@ -416,6 +424,12 @@ export async function dataSnapshot(node: MinecraftNode, packet: DataSnapshot) {
         } catch (error) {
             logger.error(`Error while writing ${dao.id}:`, error);
             return errorResponse('SEVERE', 'Database error');
+        }
+        try {
+            await cache(dao.id, dao.stats);
+        } catch (error) {
+            logger.error(`Error while caching ${dao.id}:`, error);
+            return errorResponse('SEVERE', 'Cache error');
         }
     }
 
